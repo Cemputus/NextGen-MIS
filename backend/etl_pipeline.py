@@ -299,9 +299,30 @@ class ETLPipeline:
                 payments_silver['student_id'] = payments_silver['StudentID'].apply(lambda x: f"STU{int(x):06d}" if pd.notna(x) else '')
             if 'AmountPaid' in payments_silver.columns:
                 payments_silver['amount'] = pd.to_numeric(payments_silver['AmountPaid'], errors='coerce').fillna(0)
+            # Extract fee breakdown from database
+            if 'TuitionNational' in payments_silver.columns:
+                payments_silver['tuition_national'] = pd.to_numeric(payments_silver['TuitionNational'], errors='coerce').fillna(0)
+            else:
+                payments_silver['tuition_national'] = 0
+            if 'TuitionInternational' in payments_silver.columns:
+                payments_silver['tuition_international'] = pd.to_numeric(payments_silver['TuitionInternational'], errors='coerce').fillna(0)
+            else:
+                payments_silver['tuition_international'] = 0
+            if 'FunctionalFees' in payments_silver.columns:
+                payments_silver['functional_fees'] = pd.to_numeric(payments_silver['FunctionalFees'], errors='coerce').fillna(0)
+            else:
+                payments_silver['functional_fees'] = 0
+            # Extract year
+            if 'Year' in payments_silver.columns:
+                payments_silver['year'] = pd.to_numeric(payments_silver['Year'], errors='coerce').fillna(datetime.now().year)
+            else:
+                payments_silver['year'] = datetime.now().year
             payments_silver['payment_date'] = pd.to_datetime(datetime.now(), errors='coerce')
             payments_silver['payment_method'] = 'Bank Transfer'
-            payments_silver['status'] = 'Completed'
+            if 'Status' in payments_silver.columns:
+                payments_silver['status'] = payments_silver['Status']
+            else:
+                payments_silver['status'] = 'Completed'
             if 'Semester' in payments_silver.columns:
                 payments_silver['semester'] = payments_silver['Semester']
             payments_silver['payment_id'] = payments_silver.get('PaymentID', range(1, len(payments_silver) + 1))

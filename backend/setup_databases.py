@@ -133,8 +133,7 @@ def execute_sql_file(engine, sql_file_path):
 # ==================== ACADEMICS DATABASE (DB1) ====================
 
 def generate_faculties():
-    """Generate Faculties data based on UCU actual structure - 12 Faculties/Schools from Fees Structure 2025"""
-    # UCU has exactly 12 Faculties/Schools as per official documents
+    """Generate Faculties data based on UCU actual structure - 11 Faculties/Schools"""
     from ucu_actual_data import UCU_FACULTIES
     faculties = []
     for fac in UCU_FACULTIES:
@@ -146,77 +145,57 @@ def generate_faculties():
     return pd.DataFrame(faculties)
 
 def generate_departments(faculties_df):
-    """Generate Departments data - 1000+ entries"""
+    """Generate Departments data based on UCU actual structure with exact departments"""
+    from ucu_actual_data import UCU_STRUCTURE
     departments = []
     dept_id = 1
     
-    # Base departments per faculty (based on UCU actual structure - only real departments from website)
-    # Note: Only include departments that exist on UCU website/social media
-    base_departments = {
-        1: ['Computer Science', 'Information Technology', 'Software Engineering'],  # Engineering, Design & Technology
-        2: ['Business Administration', 'Accounting', 'Finance', 'Marketing', 'Human Resource Management', 'Economics'],  # School of Business
-        3: ['Law'],  # School of Law (typically one department)
-        4: ['Social Work', 'Community Development', 'Counseling Psychology', 'Public Administration', 'Sociology', 'Political Science'],  # Social Sciences
-        5: ['Education Management', 'Curriculum Studies', 'Educational Psychology', 'Special Needs Education'],  # School of Education
-        6: ['Medicine', 'Surgery', 'Pediatrics', 'Internal Medicine'],  # School of Medicine
-        7: ['Agronomy', 'Animal Science', 'Agricultural Economics', 'Food Science'],  # Agricultural Sciences
-        8: ['Journalism', 'Media Studies', 'Communication'],  # Journalism, Media & Communication
-        9: ['Divinity', 'Theology', 'Biblical Studies', 'Church History', 'Pastoral Studies'],  # Bishop Tucker School
-        10: ['Nursing', 'Public Health', 'Midwifery', 'Community Health'],  # Public Health, Nursing & Midwifery
-        11: ['Dentistry', 'Oral Surgery'],  # School of Dentistry
-        12: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Environmental Science'],  # Faculty of Science
-    }
+    # Extract unique (faculty_id, department_name) pairs from UCU_STRUCTURE
+    dept_map = {}
+    for faculty_id, dept_name, _, _, _, _, _ in UCU_STRUCTURE:
+        if (faculty_id, dept_name) not in dept_map:
+            dept_map[(faculty_id, dept_name)] = dept_id
+            head_names = [f"Dr. {random.choice(UGANDAN_FIRST_NAMES)} {random.choice(UGANDAN_LAST_NAMES)}" 
+                         for _ in range(3)]
+            departments.append({
+                'DepartmentID': dept_id,
+                'DepartmentName': dept_name,
+                'FacultyID': faculty_id,
+                'HeadOfDepartment': random.choice(head_names)
+            })
+            dept_id += 1
     
-    # Generate ONLY base departments (actual UCU departments from website)
-    # Do NOT generate fake/placeholder departments - only use real ones
-    for faculty_id in faculties_df['FacultyID']:
-        if faculty_id in base_departments:
-            for dept_name in base_departments[faculty_id]:
-                head_names = [f"Dr. {random.choice(UGANDAN_FIRST_NAMES)} {random.choice(UGANDAN_LAST_NAMES)}" 
-                             for _ in range(3)]
-                departments.append({
-                    'DepartmentID': dept_id,
-                    'DepartmentName': dept_name,
-                    'FacultyID': faculty_id,
-                    'HeadOfDepartment': random.choice(head_names)
-                })
-                dept_id += 1
-    
-    # Only return actual UCU departments - no fake/placeholder departments
     return pd.DataFrame(departments)
 
 def generate_programs(departments_df):
-    """Generate Programs data based on UCU actual programs from Fees Structure 2025 PDF"""
-    from ucu_actual_data import UCU_PROGRAMS
+    """Generate Programs data based on UCU actual structure with exact department mapping"""
+    from ucu_actual_data import UCU_STRUCTURE
     programs = []
     program_id = 1
     
-    # Create a mapping from faculty_id to department_ids
-    faculty_dept_map = {}
+    # Create a mapping from (faculty_id, department_name) to department_id
+    dept_name_to_id = {}
     for _, dept in departments_df.iterrows():
-        fac_id = dept['FacultyID']
-        if fac_id not in faculty_dept_map:
-            faculty_dept_map[fac_id] = []
-        faculty_dept_map[fac_id].append(dept['DepartmentID'])
+        key = (dept['FacultyID'], dept['DepartmentName'])
+        dept_name_to_id[key] = dept['DepartmentID']
     
-    # Map UCU programs to departments (since PDF doesn't have departments, we'll assign to first dept in faculty)
-    for prog_name, faculty_id, duration, tuition_nat, tuition_non_nat, degree_level in UCU_PROGRAMS:
-        # Get first department in this faculty (since PDF doesn't specify departments)
-        if faculty_id in faculty_dept_map and len(faculty_dept_map[faculty_id]) > 0:
-            dept_id = faculty_dept_map[faculty_id][0]  # Assign to first department in faculty
+    # Map UCU programs to their exact departments
+    for faculty_id, dept_name, prog_name, duration, tuition_nat, tuition_non_nat, degree_level in UCU_STRUCTURE:
+        key = (faculty_id, dept_name)
+        if key in dept_name_to_id:
+            dept_id = dept_name_to_id[key]
+            programs.append({
+                'ProgramID': program_id,
+                'ProgramName': prog_name,
+                'DegreeLevel': degree_level,
+                'DepartmentID': dept_id,
+                'DurationYears': duration,
+                'TuitionNationals': tuition_nat,
+                'TuitionNonNationals': tuition_non_nat
+            })
+            program_id += 1
         else:
-            continue  # Skip if no department found
-        
-        programs.append({
-            'ProgramID': program_id,
-            'ProgramName': prog_name,
-            'DegreeLevel': degree_level,
-            'DepartmentID': dept_id,
-            'DurationYears': duration,
-            'TuitionNationals': tuition_nat,
-            'TuitionNonNationals': tuition_non_nat
-        })
-        program_id += 1
+            print(f"Warning: Department '{dept_name}' not found for faculty {faculty_id}")
     
     return pd.DataFrame(programs)
 

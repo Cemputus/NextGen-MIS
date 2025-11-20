@@ -1,27 +1,16 @@
 /**
- * Senate Dashboard - Institution-wide Analytics
- * Read-only access to all analytics and reports
+ * Senate Dashboard - Smooth, Clean UI
  */
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Container,
-  VStack,
-  Heading,
-  HStack,
-  Text,
-  Button,
-  IconButton,
-  SimpleGrid,
-  Card,
-  CardBody,
-  Spinner,
-} from '@chakra-ui/react';
-import { FaDownload, FaFilePdf, FaFileExcel, FaShare } from 'react-icons/fa';
+import { TrendingUp, Building2, FileText, Download, Share2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
-import StatsCards from '../components/StatsCards';
+import ModernStatsCards from '../components/ModernStatsCards';
 import Charts from '../components/Charts';
 import axios from 'axios';
+import { Loader2 } from 'lucide-react';
 
 const SenateDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -35,7 +24,7 @@ const SenateDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/analytics/dashboard', {
+      const response = await axios.get('/api/analytics/dashboard-stats', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         params: filters
       });
@@ -47,10 +36,6 @@ const SenateDashboard = () => {
     }
   };
 
-  const handleFilterChange = (newFilters) => {
-    setFilters(newFilters);
-  };
-
   const exportReport = async (format) => {
     try {
       const response = await axios.get(`/api/analytics/export/${format}`, {
@@ -58,60 +43,138 @@ const SenateDashboard = () => {
         params: filters,
         responseType: 'blob'
       });
-      // Handle file download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `ucu_report_${new Date().toISOString()}.${format}`);
+      link.setAttribute('download', `senate-report.${format}`);
       document.body.appendChild(link);
       link.click();
+      link.remove();
     } catch (err) {
-      console.error('Export error:', err);
+      console.error('Error exporting report:', err);
     }
   };
 
   return (
-    <Box minH="100vh" bg="#F5F7FA">
-      <Container maxW="container.xl" py={8}>
-        <VStack spacing={6} align="stretch">
-          {/* Header */}
-          <HStack justify="space-between">
-            <Box>
-              <Heading size="xl" color="blue.600">Senate Dashboard</Heading>
-              <Text color="gray.600">Institution-wide Analytics & Reports</Text>
-            </Box>
-            <HStack>
-              <Button leftIcon={<FaFilePdf />} onClick={() => exportReport('pdf')} colorScheme="red">
-                Export PDF
-              </Button>
-              <Button leftIcon={<FaFileExcel />} onClick={() => exportReport('xlsx')} colorScheme="green">
-                Export Excel
-              </Button>
-              <Button leftIcon={<FaShare />} variant="outline">
-                Share Report
-              </Button>
-            </HStack>
-          </HStack>
+    <div className="space-y-6">
+      {/* Header Actions */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Senate Dashboard</h1>
+          <p className="text-muted-foreground">Institution-wide analytics and comprehensive reporting</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => exportReport('pdf')} className="gap-2">
+            <FileText className="h-4 w-4" />
+            PDF
+          </Button>
+          <Button variant="outline" onClick={() => exportReport('excel')} className="gap-2">
+            <Download className="h-4 w-4" />
+            Excel
+          </Button>
+          <Button variant="outline" className="gap-2">
+            <Share2 className="h-4 w-4" />
+            Share
+          </Button>
+        </div>
+      </div>
 
-          {/* Global Filter Panel */}
-          <GlobalFilterPanel onFilterChange={handleFilterChange} />
+      {/* Filters */}
+      <GlobalFilterPanel onFilterChange={setFilters} />
 
-          {loading ? (
-            <Box textAlign="center" py={20}>
-              <Spinner size="xl" color="blue.500" />
-            </Box>
-          ) : (
-            <>
-              <StatsCards stats={stats} />
-              <Charts data={stats} filters={filters} type="senate" />
-            </>
-          )}
-        </VStack>
-      </Container>
-    </Box>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-muted-foreground">Loading institution data...</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* KPI Cards */}
+          <ModernStatsCards stats={stats} type="general" />
+
+          {/* Main Analytics */}
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="academics" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Academics
+              </TabsTrigger>
+              <TabsTrigger value="finance" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Finance
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Reports
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Institution Overview</CardTitle>
+                  <CardDescription>Comprehensive analytics across all faculties</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Charts data={stats} filters={filters} type="institution" />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="academics" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Academic Performance</CardTitle>
+                  <CardDescription>Institution-wide academic metrics and trends</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Charts data={stats} filters={filters} type="institution" />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="finance" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Financial Overview</CardTitle>
+                  <CardDescription>Revenue, budget, and financial performance</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-96 flex items-center justify-center text-muted-foreground">
+                    Financial analytics visualization
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="reports" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Generated Reports</CardTitle>
+                  <CardDescription>Access and download comprehensive reports</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-96 flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                    <div className="text-center">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>No reports generated yet</p>
+                      <p className="text-sm text-muted-foreground mt-2">Use the export buttons above to generate reports</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+    </div>
   );
 };
 
 export default SenateDashboard;
-
-

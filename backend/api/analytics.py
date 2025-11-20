@@ -286,11 +286,15 @@ def get_high_school_analytics():
 @analytics_bp.route('/filter-options', methods=['GET'])
 @jwt_required()
 def get_filter_options():
-    """Get available filter options based on user role"""
+    """Get available filter options based on user role with cascading support"""
     try:
         claims = get_jwt()
         user_scope = get_user_scope(claims)
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        
+        # Get filter parameters for cascading
+        faculty_id = request.args.get('faculty_id', type=int)
+        department_id = request.args.get('department_id', type=int)
         
         options = {}
         
@@ -302,20 +306,41 @@ def get_filter_options():
             )
             options['faculties'] = faculties.to_dict('records')
         
-        # Get departments
-        dept_query = "SELECT DISTINCT department_id, department_name FROM dim_department"
+        # Get departments - filtered by faculty if provided
+        dept_query = """
+            SELECT DISTINCT d.department_id, d.department_name, d.faculty_id
+            FROM dim_department d
+        """
+        dept_where = []
         if user_scope['role'] == Role.HOD and user_scope['department_id']:
-            dept_query += f" WHERE department_id = {user_scope['department_id']}"
-        dept_query += " ORDER BY department_name"
+            dept_where.append(f"d.department_id = {user_scope['department_id']}")
+        elif faculty_id:
+            dept_where.append(f"d.faculty_id = {faculty_id}")
+        
+        if dept_where:
+            dept_query += " WHERE " + " AND ".join(dept_where)
+        dept_query += " ORDER BY d.department_name"
         
         departments = pd.read_sql_query(dept_query, engine)
         options['departments'] = departments.to_dict('records')
         
-        # Get programs
-        programs = pd.read_sql_query(
-            "SELECT DISTINCT program_id, program_name FROM dim_program ORDER BY program_name",
-            engine
-        )
+        # Get programs - filtered by department if provided, or by faculty if department not provided
+        prog_query = """
+            SELECT DISTINCT p.program_id, p.program_name, p.department_id, d.faculty_id
+            FROM dim_program p
+            JOIN dim_department d ON p.department_id = d.department_id
+        """
+        prog_where = []
+        if department_id:
+            prog_where.append(f"p.department_id = {department_id}")
+        elif faculty_id:
+            prog_where.append(f"d.faculty_id = {faculty_id}")
+        
+        if prog_where:
+            prog_query += " WHERE " + " AND ".join(prog_where)
+        prog_query += " ORDER BY p.program_name"
+        
+        programs = pd.read_sql_query(prog_query, engine)
         options['programs'] = programs.to_dict('records')
         
         # Get courses

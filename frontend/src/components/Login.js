@@ -1,25 +1,15 @@
+/**
+ * Modern Login Page - UCU Style with Advanced Styling
+ * Clean, professional login interface with impressive animations
+ */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Container,
-  VStack,
-  Heading,
-  FormControl,
-  FormLabel,
-  Input,
-  Button,
-  Alert,
-  AlertIcon,
-  Text,
-  Card,
-  CardBody,
-  Icon,
-  HStack,
-  Spinner,
-  Center,
-} from '@chakra-ui/react';
-import { FaGraduationCap, FaUser, FaLock } from 'react-icons/fa';
+import { GraduationCap, Lock, User, Loader2, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Label } from './ui/label';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -27,13 +17,25 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState({ username: false, password: false });
   const { login, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      navigate('/dashboard');
+      const role = JSON.parse(localStorage.getItem('user'))?.role;
+      const routes = {
+        senate: '/senate/dashboard',
+        sysadmin: '/admin/dashboard',
+        analyst: '/analyst/dashboard',
+        student: '/student/dashboard',
+        staff: '/staff/dashboard',
+        dean: '/dean/dashboard',
+        hod: '/hod/dashboard',
+        hr: '/hr/dashboard',
+        finance: '/finance/dashboard',
+      };
+      navigate(routes[role] || '/student/dashboard');
     }
   }, [isAuthenticated, authLoading, navigate]);
 
@@ -45,7 +47,6 @@ const Login = () => {
     const result = await login(username, password);
     
     if (result.success) {
-      // Redirect to role-specific dashboard
       const role = result.user?.role;
       const routes = {
         senate: '/senate/dashboard',
@@ -58,134 +59,186 @@ const Login = () => {
         hr: '/hr/dashboard',
         finance: '/finance/dashboard',
       };
-      navigate(routes[role] || '/dashboard');
+      navigate(routes[role] || '/student/dashboard');
     } else {
-      setError(result.error);
+      setError(result.error || 'Invalid credentials');
     }
     
     setLoading(false);
   };
 
-  // Show loading while checking authentication
   if (authLoading) {
     return (
-      <Box minH="100vh" bgGradient="linear(to-br, blue.50, blue.100)">
-        <Center minH="100vh">
-          <Spinner size="xl" color="blue.500" thickness="4px" />
-        </Center>
-      </Box>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+          <p className="text-muted-foreground font-medium">Loading...</p>
+        </motion.div>
+      </div>
     );
   }
 
-  // Don't show login if already authenticated (will redirect)
   if (isAuthenticated) {
-    return null;
+    return null; // Will redirect
   }
 
   return (
-    <Box
-      minH="100vh"
-      bgGradient="linear(to-br, blue.50, blue.100)"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      py={8}
-    >
-      <Container maxW="md">
-        <Card boxShadow="2xl" borderRadius="2xl" overflow="hidden">
-          <Box bg="blue.600" p={6} textAlign="center">
-            <HStack justify="center" spacing={3} mb={2}>
-              <Icon as={FaGraduationCap} boxSize={8} color="white" />
-              <Heading size="lg" color="white">
-                UCU Analytics
-              </Heading>
-            </HStack>
-            <Text color="blue.100" fontSize="sm">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-float"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-float" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-float" style={{ animationDelay: '4s' }}></div>
+      </div>
+
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo/Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-8"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-6 shadow-glow-lg relative"
+            >
+              <GraduationCap className="h-10 w-10 text-white relative z-10" />
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-2xl blur-xl opacity-50 animate-pulse-glow"></div>
+            </motion.div>
+            <h1 className="text-4xl font-bold text-gradient-blue mb-3">
+              UCU Management Information System
+            </h1>
+            <p className="text-gray-600 font-medium text-lg">
               Uganda Christian University
-            </Text>
-          </Box>
-          
-          <CardBody p={8}>
-            <form onSubmit={handleSubmit}>
-              <VStack spacing={6}>
-                       <FormControl isRequired>
-                         <FormLabel>
-                           <HStack spacing={2}>
-                             <Icon as={FaUser} color="blue.500" />
-                             <Text>Access Number / Username / Email</Text>
-                           </HStack>
-                         </FormLabel>
-                         <Input
-                           type="text"
-                           value={username}
-                           onChange={(e) => setUsername(e.target.value)}
-                           placeholder="Enter Access Number (A#####), Username, or Email"
-                           size="lg"
-                           focusBorderColor="blue.500"
-                         />
-                         <Text fontSize="xs" color="gray.500" mt={1}>
-                           Students: Use Access Number (A##### or B#####)
-                         </Text>
-                       </FormControl>
+            </p>
+          </motion.div>
 
-                <FormControl isRequired>
-                  <FormLabel>
-                    <HStack spacing={2}>
-                      <Icon as={FaLock} color="blue.500" />
-                      <Text>Password</Text>
-                    </HStack>
-                  </FormLabel>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    size="lg"
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
+          {/* Login Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <Card className="shadow-2xl border-0 glass backdrop-blur-xl bg-white/90">
+              <CardHeader className="space-y-1 pb-6">
+                <CardTitle className="text-3xl text-center font-bold text-gray-900">
+                  Sign In
+                </CardTitle>
+                <CardDescription className="text-center text-base">
+                  Enter your credentials to access your account
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium shadow-soft"
+                    >
+                      {error}
+                    </motion.div>
+                  )}
 
-                {error && (
-                  <Alert status="error" borderRadius="md">
-                    <AlertIcon />
-                    {error}
-                  </Alert>
-                )}
+                  <div className="space-y-2">
+                    <Label htmlFor="username" className="text-sm font-semibold text-gray-700">
+                      Username / Access Number
+                    </Label>
+                    <div className="relative group">
+                      <User className={`absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 transition-colors ${
+                        focused.username ? 'text-blue-600' : 'text-gray-400'
+                      }`} />
+                      <Input
+                        id="username"
+                        type="text"
+                        placeholder="Enter username or access number"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        onFocus={() => setFocused({ ...focused, username: true })}
+                        onBlur={() => setFocused({ ...focused, username: false })}
+                        className="pl-12 h-12 text-base border-2 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-soft hover:shadow-md"
+                        required
+                        autoFocus
+                      />
+                    </div>
+                  </div>
 
-                <Button
-                  type="submit"
-                  colorScheme="blue"
-                  size="lg"
-                  width="full"
-                  isLoading={loading}
-                  loadingText="Logging in..."
-                >
-                  Login
-                </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-semibold text-gray-700">
+                      Password
+                    </Label>
+                    <div className="relative group">
+                      <Lock className={`absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 transition-colors ${
+                        focused.password ? 'text-blue-600' : 'text-gray-400'
+                      }`} />
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onFocus={() => setFocused({ ...focused, password: true })}
+                        onBlur={() => setFocused({ ...focused, password: false })}
+                        className="pl-12 h-12 text-base border-2 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-soft hover:shadow-md"
+                        required
+                      />
+                    </div>
+                  </div>
 
-                <Box
-                  bg="blue.50"
-                  p={4}
-                  borderRadius="md"
-                  width="full"
-                  borderWidth="1px"
-                  borderColor="blue.200"
-                >
-                  <Text fontSize="sm" color="blue.700" textAlign="center">
-                    <strong>Demo credentials:</strong> admin/admin123 or analyst/analyst123
-                  </Text>
-                </Box>
-              </VStack>
-            </form>
-          </CardBody>
-        </Card>
-      </Container>
-    </Box>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button
+                      type="submit"
+                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-5 w-5" />
+                          Sign In
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+
+                  <div className="text-center text-sm text-gray-600 pt-4 border-t border-gray-200">
+                    <p className="font-medium">
+                      For students: Use Access Number and password format:{' '}
+                      <code className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-mono text-xs border border-blue-200">
+                        AccessNumber@ucu
+                      </code>
+                    </p>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Footer */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="text-center mt-8 text-sm text-gray-600 font-medium"
+          >
+            <p>&copy; {new Date().getFullYear()} Uganda Christian University. All rights reserved.</p>
+          </motion.div>
+        </div>
+      </div>
+    </div>
   );
 };
 
 export default Login;
-
-
-
-

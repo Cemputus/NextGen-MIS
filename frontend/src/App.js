@@ -4,13 +4,12 @@
  */
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ChakraProvider, Spinner, Center, Box } from '@chakra-ui/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { rbac } from './utils/rbac';
-import theme from './theme';
+import { Loader2 } from 'lucide-react';
 
 // Layout
-import Layout from './components/Layout';
+import LayoutModern from './components/LayoutModern';
 
 // Auth
 import Login from './components/Login';
@@ -37,11 +36,12 @@ function PrivateRoute({ children, requiredRole = null }) {
   
   if (loading) {
     return (
-      <Box minH="100vh" bg="gray.50">
-        <Center minH="100vh">
-          <Spinner size="xl" color="blue.500" thickness="4px" />
-        </Center>
-      </Box>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
     );
   }
   
@@ -53,7 +53,7 @@ function PrivateRoute({ children, requiredRole = null }) {
     return <Navigate to={rbac.getDefaultRoute(user?.role)} />;
   }
   
-  return <Layout>{children}</Layout>;
+  return <LayoutModern>{children}</LayoutModern>;
 }
 
 function RoleRoute({ children, allowedRoles }) {
@@ -68,9 +68,8 @@ function RoleRoute({ children, allowedRoles }) {
 
 function App() {
   return (
-    <ChakraProvider theme={theme}>
-      <AuthProvider>
-        <Router>
+    <AuthProvider>
+      <Router>
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -253,7 +252,6 @@ function App() {
           </Routes>
         </Router>
       </AuthProvider>
-    </ChakraProvider>
   );
 }
 

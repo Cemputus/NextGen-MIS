@@ -1,29 +1,17 @@
 /**
- * Staff Dashboard - Personal Analytics + Class Management
+ * Staff Dashboard - Smooth, Clean UI
  */
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Container,
-  VStack,
-  Heading,
-  HStack,
-  Text,
-  Input,
-  Button,
-  SimpleGrid,
-  Card,
-  CardBody,
-  Spinner,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-} from '@chakra-ui/react';
-import { FaSearch, FaChalkboardTeacher } from 'react-icons/fa';
+import { GraduationCap, Users, BookOpen, Search } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Input } from '../components/ui/input';
+import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
+import ModernStatsCards from '../components/ModernStatsCards';
+import Charts from '../components/Charts';
 import axios from 'axios';
+import { Loader2 } from 'lucide-react';
 
 const StaffDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -31,6 +19,7 @@ const StaffDashboard = () => {
   const [selectedClass, setSelectedClass] = useState(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [filters, setFilters] = useState({});
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     loadStaffData();
@@ -43,6 +32,7 @@ const StaffDashboard = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setClasses(response.data.classes || []);
+      setStats(response.data.stats || null);
     } catch (err) {
       console.error('Error loading staff data:', err);
     } finally {
@@ -51,68 +41,119 @@ const StaffDashboard = () => {
   };
 
   return (
-    <Box minH="100vh" bg="#F5F7FA">
-      <Container maxW="container.xl" py={8}>
-        <VStack spacing={6} align="stretch">
-          <Heading size="xl" color="blue.600">Staff Dashboard</Heading>
-          
-          <Tabs>
-            <TabList>
-              <Tab>My Classes</Tab>
-              <Tab>Class Analytics</Tab>
-              <Tab>Student Search</Tab>
-            </TabList>
-            
-            <TabPanels>
-              <TabPanel>
-                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                  {classes.map(cls => (
-                    <Card key={cls.course_code} cursor="pointer" 
-                          onClick={() => setSelectedClass(cls)}
-                          borderWidth={selectedClass?.course_code === cls.course_code ? '2px' : '1px'}
-                          borderColor={selectedClass?.course_code === cls.course_code ? 'blue.500' : 'gray.200'}>
-                      <CardBody>
-                        <Text fontWeight="bold">{cls.course_code}</Text>
-                        <Text fontSize="sm" color="gray.600">{cls.course_name}</Text>
-                        <Text fontSize="sm" mt={2}>{cls.student_count} students</Text>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </SimpleGrid>
-              </TabPanel>
-              
-              <TabPanel>
-                {selectedClass && (
-                  <Box>
-                    <Text>Analytics for {selectedClass.course_code}</Text>
-                    {/* Class analytics charts */}
-                  </Box>
-                )}
-              </TabPanel>
-              
-              <TabPanel>
-                <VStack spacing={4} align="stretch">
-                  <HStack>
+    <div className="space-y-6">
+      {/* Filters */}
+      <GlobalFilterPanel onFilterChange={setFilters} />
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-muted-foreground">Loading staff data...</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* KPI Cards */}
+          {stats && <ModernStatsCards stats={stats} type="general" />}
+
+          {/* Main Content */}
+          <Tabs defaultValue="classes" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="classes" className="flex items-center gap-2">
+                <GraduationCap className="h-4 w-4" />
+                My Classes
+              </TabsTrigger>
+              <TabsTrigger value="students" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Students
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="classes" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Classes</CardTitle>
+                  <CardDescription>Manage your assigned courses and classes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {classes.length > 0 ? (
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {classes.map((cls, idx) => (
+                          <Card key={idx} className="cursor-pointer hover:shadow-md transition-shadow">
+                            <CardHeader>
+                              <CardTitle className="text-lg">{cls.course_name || `Class ${idx + 1}`}</CardTitle>
+                              <CardDescription>{cls.course_code || 'N/A'}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-sm text-muted-foreground">
+                                <p>Students: {cls.student_count || 0}</p>
+                                <p>Schedule: {cls.schedule || 'TBA'}</p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                        <div className="text-center">
+                          <GraduationCap className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                          <p>No classes assigned</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="students" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Student Management</CardTitle>
+                  <CardDescription>Search and manage students in your classes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 mb-4">
                     <Input
-                      placeholder="Search by Access Number, Reg No, or Name"
+                      placeholder="Search students..."
                       value={studentSearch}
                       onChange={(e) => setStudentSearch(e.target.value)}
+                      className="flex-1"
                     />
-                    <Button leftIcon={<FaSearch />} colorScheme="blue">
+                    <Button>
+                      <Search className="h-4 w-4 mr-2" />
                       Search
                     </Button>
-                  </HStack>
-                  {/* Student search results */}
-                </VStack>
-              </TabPanel>
-            </TabPanels>
+                  </div>
+                  <div className="h-64 flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                    Student list and management tools
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Teaching Analytics</CardTitle>
+                  <CardDescription>Performance metrics and class statistics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Charts data={stats} filters={filters} type="staff" />
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
-        </VStack>
-      </Container>
-    </Box>
+        </>
+      )}
+    </div>
   );
 };
 
 export default StaffDashboard;
-
-
