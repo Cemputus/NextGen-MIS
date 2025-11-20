@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
+import ExportButtons from '../components/ExportButtons';
 import FEXAnalytics from './FEXAnalytics';
 import HighSchoolAnalytics from './HighSchoolAnalytics';
 
@@ -16,16 +17,13 @@ const AnalystDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Analytics Workspace</h1>
           <p className="text-muted-foreground">Create and modify analytics dashboards</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
+          <ExportButtons filename="analyst_workspace" />
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             New Dashboard

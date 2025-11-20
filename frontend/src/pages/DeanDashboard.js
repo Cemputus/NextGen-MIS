@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
 import Charts from '../components/Charts';
+import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -37,6 +38,15 @@ const DeanDashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Faculty Dashboard</h1>
+          <p className="text-muted-foreground">Faculty-wide analytics and insights</p>
+        </div>
+        <ExportButtons stats={stats} filters={filters} filename="faculty_dashboard" />
+      </div>
+
       {/* Filters */}
       <GlobalFilterPanel onFilterChange={setFilters} />
 

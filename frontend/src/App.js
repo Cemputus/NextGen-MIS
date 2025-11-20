@@ -119,6 +119,7 @@ function App() {
                     <Route path="analytics" element={<HODDashboard />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
+                    <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/hod/dashboard" />} />
                   </Routes>
@@ -136,6 +137,7 @@ function App() {
                     <Route path="analytics" element={<DeanDashboard />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
+                    <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/dean/dashboard" />} />
                   </Routes>
@@ -207,6 +209,7 @@ function App() {
                     <Route path="dashboard" element={<HRDashboard />} />
                     <Route path="analytics" element={<HRDashboard />} />
                     <Route path="staff" element={<HRDashboard />} />
+                    <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/hr/dashboard" />} />
                   </Routes>
@@ -223,6 +226,7 @@ function App() {
                     <Route path="dashboard" element={<FinanceDashboard />} />
                     <Route path="analytics" element={<FinanceDashboard />} />
                     <Route path="payments" element={<FinanceDashboard />} />
+                    <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/finance/dashboard" />} />
                   </Routes>

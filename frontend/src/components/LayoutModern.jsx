@@ -48,6 +48,7 @@ const LayoutModern = ({ children }) => {
         { path: '/hod/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/hod/fex', label: 'FEX Analysis', icon: FileText },
         { path: '/hod/high-school', label: 'High School', icon: Building2 },
+        { path: '/hod/predictions', label: 'Predictions', icon: TrendingUp },
         { path: '/hod/profile', label: 'Profile', icon: User },
       ],
       dean: [
@@ -55,6 +56,7 @@ const LayoutModern = ({ children }) => {
         { path: '/dean/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/dean/fex', label: 'FEX Analysis', icon: FileText },
         { path: '/dean/high-school', label: 'High School', icon: Building2 },
+        { path: '/dean/predictions', label: 'Predictions', icon: TrendingUp },
         { path: '/dean/profile', label: 'Profile', icon: User },
       ],
       senate: [
@@ -87,12 +89,14 @@ const LayoutModern = ({ children }) => {
         { path: '/hr/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/hr/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/hr/staff', label: 'Staff', icon: Users },
+        { path: '/hr/predictions', label: 'Predictions', icon: TrendingUp },
         { path: '/hr/profile', label: 'Profile', icon: User },
       ],
       finance: [
         { path: '/finance/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/finance/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/finance/payments', label: 'Payments', icon: DollarSign },
+        { path: '/finance/predictions', label: 'Predictions', icon: TrendingUp },
         { path: '/finance/profile', label: 'Profile', icon: User },
       ],
     };
@@ -343,7 +347,7 @@ const LayoutModern = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
           <div className="max-w-7xl mx-auto p-4 md:p-6">
             {children}
           </div>

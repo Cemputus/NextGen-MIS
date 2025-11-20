@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { KPICard } from '../components/ui/kpi-card';
 import { DashboardGrid } from '../components/ui/dashboard-grid';
+import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -21,7 +22,7 @@ const AdminDashboard = () => {
   const loadSystemStats = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/analytics/dashboard-stats', {
+      const response = await axios.get('/api/dashboard/stats', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setSystemStats({
@@ -45,6 +46,15 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Console</h1>
+          <p className="text-muted-foreground">System administration and management</p>
+        </div>
+        <ExportButtons stats={systemStats} filename="admin_console" />
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-4">

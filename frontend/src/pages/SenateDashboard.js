@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
 import Charts from '../components/Charts';
+import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -24,7 +25,7 @@ const SenateDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/analytics/dashboard-stats', {
+      const response = await axios.get('/api/dashboard/stats', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         params: filters
       });
@@ -63,20 +64,7 @@ const SenateDashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900">Senate Dashboard</h1>
           <p className="text-muted-foreground">Institution-wide analytics and comprehensive reporting</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => exportReport('pdf')} className="gap-2">
-            <FileText className="h-4 w-4" />
-            PDF
-          </Button>
-          <Button variant="outline" onClick={() => exportReport('excel')} className="gap-2">
-            <Download className="h-4 w-4" />
-            Excel
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share
-          </Button>
-        </div>
+        <ExportButtons stats={stats} filters={filters} filename="senate_dashboard" />
       </div>
 
       {/* Filters */}

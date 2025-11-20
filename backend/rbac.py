@@ -42,6 +42,7 @@ class Resource(str, Enum):
     FACULTY_ANALYTICS = "faculty_analytics"
     HR_ANALYTICS = "hr_analytics"
     FINANCE_ANALYTICS = "finance_analytics"
+    PREDICTIONS = "predictions"
 
 class Permission(str, Enum):
     """Permissions that can be granted"""
@@ -72,6 +73,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.SENATE, Resource.STAFF, {Permission.READ}),
         RolePermission(Role.SENATE, Resource.FEX_ANALYTICS, {Permission.READ, Permission.EXPORT}),
         RolePermission(Role.SENATE, Resource.HIGH_SCHOOL_ANALYTICS, {Permission.READ, Permission.EXPORT}),
+        RolePermission(Role.SENATE, Resource.PREDICTIONS, {Permission.READ, Permission.EXPORT}),
         RolePermission(Role.SENATE, Resource.PROFILE, {Permission.READ, Permission.UPDATE}),
     ],
     
@@ -80,6 +82,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.SYSADMIN, Resource.ANALYTICS, {Permission.READ, Permission.WRITE, Permission.EXPORT}),
         RolePermission(Role.SYSADMIN, Resource.FEX_ANALYTICS, {Permission.READ, Permission.WRITE, Permission.EXPORT}),
         RolePermission(Role.SYSADMIN, Resource.HIGH_SCHOOL_ANALYTICS, {Permission.READ, Permission.WRITE, Permission.EXPORT}),
+        RolePermission(Role.SYSADMIN, Resource.PREDICTIONS, {Permission.READ, Permission.WRITE, Permission.EXPORT, Permission.MANAGE}),
         RolePermission(Role.SYSADMIN, Resource.USER_MANAGEMENT, {Permission.CREATE, Permission.READ, Permission.UPDATE, Permission.DELETE, Permission.MANAGE}),
         RolePermission(Role.SYSADMIN, Resource.SYSTEM_SETTINGS, {Permission.READ, Permission.UPDATE, Permission.MANAGE}),
         RolePermission(Role.SYSADMIN, Resource.ETL_JOBS, {Permission.READ, Permission.UPDATE, Permission.MANAGE}),
@@ -96,6 +99,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.ANALYST, Resource.STAFF, {Permission.READ}),
         RolePermission(Role.ANALYST, Resource.FEX_ANALYTICS, {Permission.READ, Permission.WRITE, Permission.EXPORT}),
         RolePermission(Role.ANALYST, Resource.HIGH_SCHOOL_ANALYTICS, {Permission.READ, Permission.WRITE, Permission.EXPORT}),
+        RolePermission(Role.ANALYST, Resource.PREDICTIONS, {Permission.READ, Permission.WRITE, Permission.EXPORT}),
         RolePermission(Role.ANALYST, Resource.PROFILE, {Permission.READ, Permission.UPDATE}),
     ],
     
@@ -106,6 +110,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.STUDENT, Resource.ATTENDANCE, {Permission.READ}, scope="own"),
         RolePermission(Role.STUDENT, Resource.PAYMENTS, {Permission.READ}, scope="own"),
         RolePermission(Role.STUDENT, Resource.ENROLLMENTS, {Permission.READ}, scope="own"),
+        RolePermission(Role.STUDENT, Resource.PREDICTIONS, {Permission.READ}, scope="own"),
         RolePermission(Role.STUDENT, Resource.PROFILE, {Permission.READ, Permission.UPDATE}, scope="own"),
     ],
     
@@ -115,6 +120,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.STAFF, Resource.STUDENTS, {Permission.READ}, scope="classes"),
         RolePermission(Role.STAFF, Resource.GRADES, {Permission.READ, Permission.WRITE}, scope="classes"),
         RolePermission(Role.STAFF, Resource.ATTENDANCE, {Permission.READ, Permission.WRITE}, scope="classes"),
+        RolePermission(Role.STAFF, Resource.PREDICTIONS, {Permission.READ}, scope="classes"),
         RolePermission(Role.STAFF, Resource.PROFILE, {Permission.READ, Permission.UPDATE}, scope="own"),
     ],
     
@@ -126,6 +132,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.DEAN, Resource.STAFF, {Permission.READ}, scope="faculty"),
         RolePermission(Role.DEAN, Resource.FEX_ANALYTICS, {Permission.READ, Permission.EXPORT}, scope="faculty"),
         RolePermission(Role.DEAN, Resource.HIGH_SCHOOL_ANALYTICS, {Permission.READ, Permission.EXPORT}, scope="faculty"),
+        RolePermission(Role.DEAN, Resource.PREDICTIONS, {Permission.READ, Permission.EXPORT}, scope="faculty"),
         RolePermission(Role.DEAN, Resource.PROFILE, {Permission.READ, Permission.UPDATE}),
     ],
     
@@ -137,6 +144,7 @@ ROLE_PERMISSIONS: Dict[Role, List[RolePermission]] = {
         RolePermission(Role.HOD, Resource.STAFF, {Permission.READ}, scope="department"),
         RolePermission(Role.HOD, Resource.FEX_ANALYTICS, {Permission.READ, Permission.EXPORT}, scope="department"),
         RolePermission(Role.HOD, Resource.HIGH_SCHOOL_ANALYTICS, {Permission.READ, Permission.EXPORT}, scope="department"),
+        RolePermission(Role.HOD, Resource.PREDICTIONS, {Permission.READ, Permission.EXPORT}, scope="department"),
         RolePermission(Role.HOD, Resource.PROFILE, {Permission.READ, Permission.UPDATE}),
     ],
     

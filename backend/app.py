@@ -21,6 +21,12 @@ try:
 except ImportError:
     predictions_bp = None
 
+# Import export blueprint
+try:
+    from api.export import export_bp
+except ImportError:
+    export_bp = None
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
@@ -35,6 +41,8 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(analytics_bp)
 if predictions_bp:
     app.register_blueprint(predictions_bp)
+if export_bp:
+    app.register_blueprint(export_bp)
 
 # Initialize ML model
 predictor = MultiModelPredictor()
@@ -209,21 +217,36 @@ def get_dashboard_stats():
 @app.route('/api/dashboard/students-by-department', methods=['GET'])
 @jwt_required()
 def get_students_by_department():
-    """Get student count by department"""
+    """Get student count by department with filters"""
     try:
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
         
-        query = """
+        # Build WHERE clause based on filters
+        where_clauses = []
+        if filters.get('faculty_id'):
+            where_clauses.append(f"dc.department IN (SELECT department_name FROM dim_department WHERE faculty_id = {filters['faculty_id']})")
+        if filters.get('department_id'):
+            where_clauses.append(f"dc.department = (SELECT department_name FROM dim_department WHERE department_id = {filters['department_id']})")
+        if filters.get('program_id'):
+            where_clauses.append(f"fe.student_id IN (SELECT student_id FROM dim_student WHERE program_id = {filters['program_id']})")
+        if filters.get('semester_id'):
+            where_clauses.append(f"fe.semester_id = {filters['semester_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        query = f"""
         SELECT 
             dc.department,
             COUNT(DISTINCT fe.student_id) as student_count
         FROM fact_enrollment fe
         JOIN dim_course dc ON fe.course_code = dc.course_code
+        {where_clause}
         GROUP BY dc.department
         ORDER BY student_count DESC
         """
         
-        df = pd.read_sql_query(query, engine)
+        df = pd.read_sql_query(text(query), engine)
         engine.dispose()
         
         return jsonify({
@@ -237,11 +260,25 @@ def get_students_by_department():
 @app.route('/api/dashboard/grades-over-time', methods=['GET'])
 @jwt_required()
 def get_grades_over_time():
-    """Get average grades over time"""
+    """Get average grades over time with filters"""
     try:
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
         
-        query = """
+        # Build WHERE clause
+        where_clauses = []
+        if filters.get('faculty_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+        if filters.get('department_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+        if filters.get('program_id'):
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        if filters.get('semester_id'):
+            where_clauses.append(f"fg.semester_id = {filters['semester_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        query = f"""
         SELECT 
             CONCAT(dt.month_name, ' ', CAST(dt.year AS CHAR)) as period,
             AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade,
@@ -249,11 +286,13 @@ def get_grades_over_time():
             COUNT(CASE WHEN fg.exam_status = 'FEX' THEN 1 END) as failed_exams
         FROM fact_grade fg
         JOIN dim_time dt ON fg.date_key = dt.date_key
+        JOIN dim_student ds ON fg.student_id = ds.student_id
+        {where_clause}
         GROUP BY dt.year, dt.month, dt.month_name
         ORDER BY dt.year, dt.month
         """
         
-        df = pd.read_sql_query(query, engine)
+        df = pd.read_sql_query(text(query), engine)
         engine.dispose()
         
         return jsonify({
@@ -269,19 +308,34 @@ def get_grades_over_time():
 @app.route('/api/dashboard/payment-status', methods=['GET'])
 @jwt_required()
 def get_payment_status():
-    """Get payment status distribution"""
+    """Get payment status distribution with filters"""
     try:
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
         
-        query = """
+        # Build WHERE clause
+        where_clauses = []
+        if filters.get('faculty_id'):
+            where_clauses.append(f"fp.student_id IN (SELECT student_id FROM dim_student WHERE program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']})))")
+        if filters.get('department_id'):
+            where_clauses.append(f"fp.student_id IN (SELECT student_id FROM dim_student WHERE program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']}))")
+        if filters.get('program_id'):
+            where_clauses.append(f"fp.student_id IN (SELECT student_id FROM dim_student WHERE program_id = {filters['program_id']})")
+        if filters.get('semester_id'):
+            where_clauses.append(f"fp.semester_id = {filters['semester_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        query = f"""
         SELECT 
             status,
             COUNT(*) as count
-        FROM fact_payment
+        FROM fact_payment fp
+        {where_clause}
         GROUP BY status
         """
         
-        df = pd.read_sql_query(query, engine)
+        df = pd.read_sql_query(text(query), engine)
         engine.dispose()
         
         return jsonify({
@@ -329,24 +383,44 @@ def get_grade_distribution():
     """Get grade distribution"""
     try:
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
         
-        query = """
+        # Build WHERE clause based on filters
+        where_clauses = []
+        if filters.get('faculty_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+        if filters.get('department_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+        if filters.get('program_id'):
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        if filters.get('semester_id'):
+            where_clauses.append(f"fg.semester_id = {filters['semester_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        query = f"""
         SELECT 
-            letter_grade,
+            fg.letter_grade,
             COUNT(*) as count
-        FROM fact_grade
-        GROUP BY letter_grade
+        FROM fact_grade fg
+        JOIN dim_student ds ON fg.student_id = ds.student_id
+        {where_clause}
+        GROUP BY fg.letter_grade
         ORDER BY 
-            CASE letter_grade
+            CASE fg.letter_grade
                 WHEN 'A' THEN 1
-                WHEN 'B' THEN 2
-                WHEN 'C' THEN 3
-                WHEN 'D' THEN 4
-                WHEN 'F' THEN 5
+                WHEN 'B+' THEN 2
+                WHEN 'B' THEN 3
+                WHEN 'C+' THEN 4
+                WHEN 'C' THEN 5
+                WHEN 'D+' THEN 6
+                WHEN 'D' THEN 7
+                WHEN 'F' THEN 8
+                ELSE 9
             END
         """
         
-        df = pd.read_sql_query(query, engine)
+        df = pd.read_sql_query(text(query), engine)
         engine.dispose()
         
         return jsonify({
@@ -355,6 +429,92 @@ def get_grade_distribution():
         })
     except Exception as e:
         print(f"Error in get_grade_distribution: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dashboard/top-students', methods=['GET'])
+@jwt_required()
+def get_top_students():
+    """Get top performing students"""
+    try:
+        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
+        limit = int(filters.get('limit', 10))
+        
+        # Build WHERE clause
+        where_clauses = []
+        if filters.get('faculty_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+        if filters.get('department_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+        if filters.get('program_id'):
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        query = f"""
+        SELECT 
+            CONCAT(ds.first_name, ' ', ds.last_name) as student_name,
+            AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade
+        FROM fact_grade fg
+        JOIN dim_student ds ON fg.student_id = ds.student_id
+        {where_clause}
+        GROUP BY ds.student_id, ds.first_name, ds.last_name
+        HAVING AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) IS NOT NULL
+        ORDER BY avg_grade DESC
+        LIMIT {limit}
+        """
+        
+        df = pd.read_sql_query(text(query), engine)
+        engine.dispose()
+        
+        return jsonify({
+            'students': df['student_name'].tolist(),
+            'grades': df['avg_grade'].round(2).tolist()
+        })
+    except Exception as e:
+        print(f"Error in get_top_students: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dashboard/attendance-trends', methods=['GET'])
+@jwt_required()
+def get_attendance_trends():
+    """Get attendance trends over time"""
+    try:
+        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
+        
+        # Build WHERE clause
+        where_clauses = []
+        if filters.get('faculty_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+        if filters.get('department_id'):
+            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+        if filters.get('program_id'):
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        query = f"""
+        SELECT 
+            CONCAT(dt.month_name, ' ', CAST(dt.year AS CHAR)) as period,
+            AVG(fa.total_hours) as avg_attendance
+        FROM fact_attendance fa
+        JOIN dim_time dt ON fa.date_key = dt.date_key
+        JOIN dim_student ds ON fa.student_id = ds.student_id
+        {where_clause}
+        GROUP BY dt.year, dt.month, dt.month_name
+        ORDER BY dt.year, dt.month
+        """
+        
+        df = pd.read_sql_query(text(query), engine)
+        engine.dispose()
+        
+        return jsonify({
+            'periods': df['period'].tolist(),
+            'attendance': df['avg_attendance'].round(2).tolist()
+        })
+    except Exception as e:
+        print(f"Error in get_attendance_trends: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/predict-performance', methods=['POST'])

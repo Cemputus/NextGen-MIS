@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import ModernStatsCards from '../components/ModernStatsCards';
 import Charts from '../components/Charts';
+import ExportButtons from '../components/ExportButtons';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
@@ -60,6 +61,15 @@ const StudentDashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Academic Dashboard</h1>
+          <p className="text-muted-foreground">Your academic performance and progress</p>
+        </div>
+        <ExportButtons stats={stats} filename="student_dashboard" />
+      </div>
+
       {/* KPI Cards */}
       <ModernStatsCards stats={stats} type="student" />
 

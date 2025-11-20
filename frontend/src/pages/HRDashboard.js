@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
 import Charts from '../components/Charts';
+import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -27,7 +28,7 @@ const HRDashboard = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         params: filters
       }).catch(() => {
-        return axios.get('/api/analytics/dashboard-stats', {
+        return axios.get('/api/dashboard/stats', {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           params: filters
         });
@@ -48,6 +49,15 @@ const HRDashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">HR Dashboard</h1>
+          <p className="text-muted-foreground">Human resources analytics and management</p>
+        </div>
+        <ExportButtons stats={stats} filters={filters} filename="hr_dashboard" />
+      </div>
+
       {/* Filters */}
       <GlobalFilterPanel onFilterChange={setFilters} />
 

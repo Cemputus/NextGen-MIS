@@ -10,6 +10,7 @@ import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
 import Charts from '../components/Charts';
+import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 
@@ -42,6 +43,15 @@ const StaffDashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Export */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Staff Dashboard</h1>
+          <p className="text-muted-foreground">Class management and teaching analytics</p>
+        </div>
+        <ExportButtons stats={stats} filters={filters} filename="staff_dashboard" />
+      </div>
+
       {/* Filters */}
       <GlobalFilterPanel onFilterChange={setFilters} />
 

@@ -57,10 +57,14 @@ def predict_student_performance():
         user_scope = get_user_scope(claims)
         data = request.get_json()
         
+        # Check RBAC permissions
+        if not has_permission(user_scope['role'], Resource.PREDICTIONS, Permission.READ, user_scope):
+            return jsonify({'error': 'Permission denied'}), 403
+        
         student_id = data.get('student_id') or data.get('access_number') or data.get('reg_number')
         model_type = data.get('model_type', 'ensemble')  # 'random_forest', 'gradient_boosting', 'neural_network', 'ensemble'
         
-        # Check permissions
+        # Check scope permissions
         if user_scope['role'] == Role.STUDENT:
             # Students can only predict their own performance
             if user_scope['access_number'] and student_id != user_scope['access_number']:
