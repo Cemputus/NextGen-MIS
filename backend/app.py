@@ -433,8 +433,8 @@ def get_grade_distribution():
 
 @app.route('/api/dashboard/top-students', methods=['GET'])
 @jwt_required()
-def get_top_students():
-    """Get top performing students"""
+def get_top_students_filtered():
+    """Get top performing students with filters"""
     try:
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
         filters = request.args.to_dict()
@@ -472,7 +472,7 @@ def get_top_students():
             'grades': df['avg_grade'].round(2).tolist()
         })
     except Exception as e:
-        print(f"Error in get_top_students: {e}")
+        print(f"Error in get_top_students_filtered: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/attendance-trends', methods=['GET'])
@@ -615,35 +615,6 @@ def get_mex_fex_analysis():
         print(f"Error in get_mex_fex_analysis: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/dashboard/top-students', methods=['GET'])
-@jwt_required()
-def get_top_students():
-    """Get top performing students"""
-    try:
-        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
-        
-        query = """
-        SELECT 
-            ds.student_id,
-            CONCAT(ds.first_name, ' ', ds.last_name) as student_name,
-            AVG(fg.grade) as avg_grade
-        FROM fact_grade fg
-        JOIN dim_student ds ON fg.student_id = ds.student_id
-        GROUP BY ds.student_id, ds.first_name, ds.last_name
-        ORDER BY avg_grade DESC
-        LIMIT 10
-        """
-        
-        df = pd.read_sql_query(query, engine)
-        engine.dispose()
-        
-        return jsonify({
-            'students': df['student_name'].tolist(),
-            'grades': df['avg_grade'].round(2).tolist()
-        })
-    except Exception as e:
-        print(f"Error in get_top_students: {e}")
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/report/generate', methods=['POST', 'GET'])
 @jwt_required()
