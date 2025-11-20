@@ -134,6 +134,52 @@ def get_dashboard_stats():
             print(f"Error getting avg_attendance: {e}")
             avg_attendance = 0.0
         
+        # Total High Schools
+        try:
+            high_schools_result = pd.read_sql_query(
+                "SELECT COUNT(DISTINCT high_school) as count FROM dim_student WHERE high_school IS NOT NULL AND high_school != ''", engine
+            )
+            total_high_schools = int(high_schools_result['count'][0]) if not high_schools_result.empty and pd.notna(high_schools_result['count'][0]) else 0
+        except Exception as e:
+            print(f"Error getting total_high_schools: {e}")
+            total_high_schools = 0
+        
+        # Average Retention Rate (Active students / Total students)
+        try:
+            retention_result = pd.read_sql_query(
+                """
+                SELECT 
+                    COUNT(DISTINCT CASE WHEN status = 'Active' THEN student_id END) as active,
+                    COUNT(DISTINCT student_id) as total
+                FROM dim_student
+                """, engine
+            )
+            if not retention_result.empty and pd.notna(retention_result['total'][0]) and retention_result['total'][0] > 0:
+                avg_retention_rate = (retention_result['active'][0] / retention_result['total'][0]) * 100
+            else:
+                avg_retention_rate = 0.0
+        except Exception as e:
+            print(f"Error getting avg_retention_rate: {e}")
+            avg_retention_rate = 0.0
+        
+        # Average Graduation Rate (Graduated students / Total students)
+        try:
+            graduation_result = pd.read_sql_query(
+                """
+                SELECT 
+                    COUNT(DISTINCT CASE WHEN status = 'Graduated' THEN student_id END) as graduated,
+                    COUNT(DISTINCT student_id) as total
+                FROM dim_student
+                """, engine
+            )
+            if not graduation_result.empty and pd.notna(graduation_result['total'][0]) and graduation_result['total'][0] > 0:
+                avg_graduation_rate = (graduation_result['graduated'][0] / graduation_result['total'][0]) * 100
+            else:
+                avg_graduation_rate = 0.0
+        except Exception as e:
+            print(f"Error getting avg_graduation_rate: {e}")
+            avg_graduation_rate = 0.0
+        
         return jsonify({
             'total_students': total_students,
             'total_courses': total_courses,
@@ -143,7 +189,13 @@ def get_dashboard_stats():
             'avg_attendance': round(avg_attendance, 2),
             'missed_exams': mex_count,
             'failed_exams': fex_count,
-            'tuition_related_missed': tuition_mex_count
+            'tuition_related_missed': tuition_mex_count,
+            'total_high_schools': total_high_schools,
+            'high_schools_count': total_high_schools,
+            'avg_retention_rate': round(avg_retention_rate, 2),
+            'retention_rate': round(avg_retention_rate, 2),
+            'avg_graduation_rate': round(avg_graduation_rate, 2),
+            'graduation_rate': round(avg_graduation_rate, 2)
         })
     except Exception as e:
         import traceback

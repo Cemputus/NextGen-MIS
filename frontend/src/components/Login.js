@@ -1,5 +1,5 @@
 /**
- * Modern Login Page - UCU Style with Advanced Styling
+ * Modern Login Page - NextGen Data Architects Style
  * Clean, professional login interface with impressive animations
  */
 import React, { useState, useEffect } from 'react';
@@ -217,7 +217,7 @@ const Login = () => {
                     <p className="font-medium">
                       For students: Use Access Number and password format:{' '}
                       <code className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-mono text-xs border border-blue-200">
-                        AccessNumber@ucu
+                        AccessNumber@nextgen
                       </code>
                     </p>
                   </div>
@@ -233,7 +233,7 @@ const Login = () => {
             transition={{ delay: 0.6 }}
             className="text-center mt-8 text-sm text-gray-600 font-medium"
           >
-            <p>&copy; {new Date().getFullYear()} Uganda Christian University. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} NextGen Data Architects. All rights reserved.</p>
           </motion.div>
         </div>
       </div>

@@ -129,10 +129,10 @@ const LayoutModern = ({ children }) => {
                     transition={{ duration: 0.2 }}
                   >
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                      UCU MIS
+                      NextGen MIS
                     </h1>
                     <p className="text-xs text-muted-foreground font-medium mt-1">
-                      Management System
+                      Data Architects
                     </p>
                   </motion.div>
                 )}
@@ -239,10 +239,10 @@ const LayoutModern = ({ children }) => {
                 <div className="p-6 border-b border-gray-200 flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                      UCU MIS
+                      NextGen MIS
                     </h1>
                     <p className="text-xs text-muted-foreground font-medium mt-1">
-                      Management System
+                      Data Architects
                     </p>
                   </div>
                   <Button
@@ -311,7 +311,7 @@ const LayoutModern = ({ children }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-4 md:px-6 py-4 sticky top-0 z-30 shadow-sm">
+        <header className="bg-gradient-to-r from-white via-blue-50/50 to-white backdrop-blur-xl border-b border-gray-200/50 px-4 md:px-6 py-4 sticky top-0 z-30 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
