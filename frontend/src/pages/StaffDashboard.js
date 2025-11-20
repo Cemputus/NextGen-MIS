@@ -9,7 +9,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
-import Charts from '../components/Charts';
+import RoleBasedCharts from '../components/RoleBasedCharts';
 import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
@@ -155,7 +155,7 @@ const StaffDashboard = () => {
                   <CardDescription>Performance metrics and class statistics</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Charts data={stats} filters={filters} type="staff" />
+                  <RoleBasedCharts filters={filters} type="staff" />
                 </CardContent>
               </Card>
             </TabsContent>

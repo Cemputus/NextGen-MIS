@@ -142,6 +142,12 @@ CREATE TABLE IF NOT EXISTS fact_payment (
     payment_method VARCHAR(50),
     status VARCHAR(20),
     student_type VARCHAR(20) DEFAULT 'national',  -- 'national' or 'international'
+    payment_timestamp DATETIME,  -- Exact payment timestamp
+    semester_start_date DATE,  -- Semester start date for deadline calculation
+    deadline_met BOOLEAN DEFAULT FALSE,  -- Whether payment met the deadline
+    deadline_type VARCHAR(50),  -- Which deadline: prompt_payment, registration, midterm, full_fees, late_penalty_week1, late_penalty_week2
+    weeks_from_deadline DECIMAL(5,2),  -- Weeks from the relevant deadline (negative if before, positive if after)
+    late_penalty DECIMAL(15,2) DEFAULT 0,  -- Late penalty amount if applicable
     FOREIGN KEY (student_id) REFERENCES dim_student(student_id) ON DELETE CASCADE,
     FOREIGN KEY (date_key) REFERENCES dim_time(date_key) ON DELETE CASCADE,
     FOREIGN KEY (semester_id) REFERENCES dim_semester(semester_id) ON DELETE CASCADE,
@@ -149,7 +155,10 @@ CREATE TABLE IF NOT EXISTS fact_payment (
     INDEX idx_date (date_key),
     INDEX idx_semester (semester_id),
     INDEX idx_year (year),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    INDEX idx_payment_timestamp (payment_timestamp),
+    INDEX idx_deadline_met (deadline_met),
+    INDEX idx_deadline_type (deadline_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Fact: Grade

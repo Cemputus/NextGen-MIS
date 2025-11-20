@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS attendance (
 
 -- Student Fees Table
 -- Updated to include fees breakdown: tuition (national/international) + functional fees
+-- Added payment tracking with timestamps and deadline compliance
 CREATE TABLE IF NOT EXISTS student_fees (
     PaymentID INT PRIMARY KEY AUTO_INCREMENT,
     StudentID INT,
@@ -148,8 +149,20 @@ CREATE TABLE IF NOT EXISTS student_fees (
     AmountPaid DECIMAL(15,2),  -- Total amount paid
     Balance DECIMAL(15,2),  -- Outstanding balance
     StudentType VARCHAR(20) DEFAULT 'national',  -- 'national' or 'international'
+    PaymentDate DATETIME DEFAULT CURRENT_TIMESTAMP,  -- When payment was made
+    PaymentTimestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,  -- Exact timestamp
+    PaymentMethod VARCHAR(50) DEFAULT 'Bank Transfer',  -- Payment method (Bank Transfer, Mobile Money, Cash, etc.)
+    Status VARCHAR(20) DEFAULT 'Pending',  -- Payment status: Pending, Completed, Failed, Refunded
+    SemesterStartDate DATE,  -- Semester start date for deadline calculation
+    DeadlineMet BOOLEAN DEFAULT FALSE,  -- Whether payment met the deadline
+    DeadlineType VARCHAR(50),  -- Which deadline: prompt_payment, registration, midterm, full_fees, late_penalty_week1, late_penalty_week2
+    WeeksFromDeadline DECIMAL(5,2),  -- Weeks from the relevant deadline (negative if before, positive if after)
+    LatePenalty DECIMAL(15,2) DEFAULT 0,  -- Late penalty amount if applicable
     FOREIGN KEY (StudentID) REFERENCES students(StudentID) ON DELETE CASCADE,
     INDEX idx_student (StudentID),
     INDEX idx_semester (Semester),
-    INDEX idx_year (Year)
+    INDEX idx_year (Year),
+    INDEX idx_payment_date (PaymentDate),
+    INDEX idx_status (Status),
+    INDEX idx_deadline_met (DeadlineMet)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

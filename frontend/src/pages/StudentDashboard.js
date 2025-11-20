@@ -6,7 +6,7 @@ import { Award, BookOpen, Calendar, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import ModernStatsCards from '../components/ModernStatsCards';
-import Charts from '../components/Charts';
+import RoleBasedCharts from '../components/RoleBasedCharts';
 import ExportButtons from '../components/ExportButtons';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
@@ -25,13 +25,25 @@ const StudentDashboard = () => {
   const loadStudentData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/analytics/student', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        params: { access_number: user?.access_number || user?.username }
-      });
-      setStats(response.data);
+      // Try student analytics endpoint first
+      let response;
+      try {
+        response = await axios.get('/api/analytics/student', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          params: { access_number: user?.access_number || user?.username }
+        });
+        setStats(response.data);
+      } catch (err) {
+        // Fallback to dashboard stats with student scope
+        response = await axios.get('/api/dashboard/stats', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          params: { access_number: user?.access_number || user?.username }
+        });
+        setStats(response.data);
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load data');
+      console.error('Error loading student data:', err);
+      setError(err.response?.data?.error || 'Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -101,7 +113,7 @@ const StudentDashboard = () => {
               <CardDescription>Your grades and academic progress over time</CardDescription>
             </CardHeader>
             <CardContent>
-              <Charts data={stats} type="student" />
+              <RoleBasedCharts filters={{}} type="student" />
             </CardContent>
           </Card>
         </TabsContent>

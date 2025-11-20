@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
-import Charts from '../components/Charts';
+import RoleBasedCharts from '../components/RoleBasedCharts';
 import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
@@ -90,7 +90,7 @@ const DeanDashboard = () => {
                   <CardDescription>Key metrics and trends</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Charts data={stats} filters={filters} type="faculty" />
+                  <RoleBasedCharts filters={filters} type="faculty" />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -102,7 +102,7 @@ const DeanDashboard = () => {
                   <CardDescription>Student enrollment, distribution, and performance metrics</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Charts data={stats} filters={filters} type="faculty" />
+                  <RoleBasedCharts filters={filters} type="faculty" />
                 </CardContent>
               </Card>
             </TabsContent>

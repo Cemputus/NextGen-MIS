@@ -389,3 +389,161 @@ def get_filter_options():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@analytics_bp.route('/student', methods=['GET'])
+@jwt_required()
+def get_student_analytics():
+    """Get student-specific analytics"""
+    try:
+        claims = get_jwt()
+        user_scope = get_user_scope(claims)
+        
+        # Check permission
+        if not has_permission(user_scope['role'], Resource.ANALYTICS, Permission.READ, user_scope):
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        
+        # Get student identifier
+        access_number = request.args.get('access_number') or user_scope.get('access_number')
+        student_id = user_scope.get('student_id')
+        
+        if not access_number and not student_id:
+            return jsonify({'error': 'Student identifier required'}), 400
+        
+        # Build query to get student data
+        if student_id:
+            where_clause = "WHERE ds.student_id = :student_id"
+            params = {'student_id': student_id}
+        else:
+            where_clause = "WHERE ds.access_number = :access_number"
+            params = {'access_number': access_number.upper()}
+        
+        query = f"""
+        SELECT 
+            ds.student_id,
+            ds.access_number,
+            ds.reg_no,
+            CONCAT(ds.first_name, ' ', ds.last_name) as full_name,
+            ds.gender,
+            ds.nationality,
+            ds.high_school,
+            ds.year_of_study,
+            ds.status,
+            dp.program_name,
+            ddept.department_name,
+            df.faculty_name,
+            -- Academic stats
+            COUNT(DISTINCT fe.course_code) as total_courses,
+            COUNT(DISTINCT fg.grade_id) as total_grades,
+            AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade,
+            COUNT(CASE WHEN fg.exam_status = 'FEX' THEN 1 END) as failed_exams,
+            COUNT(CASE WHEN fg.exam_status = 'MEX' THEN 1 END) as missed_exams,
+            COUNT(CASE WHEN fg.exam_status = 'Completed' THEN 1 END) as completed_exams,
+            -- Payment stats
+            SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) as total_paid,
+            SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END) as total_pending,
+            COUNT(DISTINCT fp.payment_id) as total_payments,
+            -- Attendance stats
+            AVG(fa.total_hours) as avg_attendance_hours,
+            SUM(fa.days_present) as total_days_present
+        FROM dim_student ds
+        LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+        LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+        LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+        LEFT JOIN fact_enrollment fe ON ds.student_id = fe.student_id
+        LEFT JOIN fact_grade fg ON ds.student_id = fg.student_id
+        LEFT JOIN fact_payment fp ON ds.student_id = fp.student_id
+        LEFT JOIN fact_attendance fa ON ds.student_id = fa.student_id
+        {where_clause}
+        GROUP BY ds.student_id, ds.access_number, ds.reg_no, ds.first_name, ds.last_name,
+                 ds.gender, ds.nationality, ds.high_school, ds.year_of_study, ds.status,
+                 dp.program_name, ddept.department_name, df.faculty_name
+        """
+        
+        df = pd.read_sql_query(text(query), engine, params=params)
+        engine.dispose()
+        
+        if df.empty:
+            return jsonify({'error': 'Student not found'}), 404
+        
+        student_data = df.iloc[0].to_dict()
+        
+        # Get grade breakdown
+        grade_query = f"""
+        SELECT 
+            letter_grade,
+            COUNT(*) as count
+        FROM fact_grade fg
+        JOIN dim_student ds ON fg.student_id = ds.student_id
+        {where_clause}
+        AND fg.exam_status = 'Completed'
+        GROUP BY letter_grade
+        ORDER BY 
+            CASE letter_grade
+                WHEN 'A' THEN 1
+                WHEN 'B+' THEN 2
+                WHEN 'B' THEN 3
+                WHEN 'C+' THEN 4
+                WHEN 'C' THEN 5
+                WHEN 'D+' THEN 6
+                WHEN 'D' THEN 7
+                WHEN 'F' THEN 8
+                ELSE 9
+            END
+        """
+        
+        grade_df = pd.read_sql_query(text(grade_query), engine, params=params)
+        
+        # Get grades over time
+        time_query = f"""
+        SELECT 
+            CONCAT(dt.month_name, ' ', CAST(dt.year AS CHAR)) as period,
+            AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade
+        FROM fact_grade fg
+        JOIN dim_student ds ON fg.student_id = ds.student_id
+        JOIN dim_time dt ON fg.date_key = dt.date_key
+        {where_clause}
+        GROUP BY dt.year, dt.month, dt.month_name
+        ORDER BY dt.year, dt.month
+        """
+        
+        time_df = pd.read_sql_query(text(time_query), engine, params=params)
+        
+        engine.dispose()
+        
+        return jsonify({
+            'student_id': int(student_data['student_id']) if pd.notna(student_data['student_id']) else None,
+            'access_number': student_data.get('access_number'),
+            'reg_number': student_data.get('reg_no'),
+            'full_name': student_data.get('full_name'),
+            'program': student_data.get('program_name'),
+            'department': student_data.get('department_name'),
+            'faculty': student_data.get('faculty_name'),
+            'year_of_study': int(student_data['year_of_study']) if pd.notna(student_data['year_of_study']) else None,
+            'total_courses': int(student_data['total_courses']) if pd.notna(student_data['total_courses']) else 0,
+            'total_grades': int(student_data['total_grades']) if pd.notna(student_data['total_grades']) else 0,
+            'avg_grade': round(float(student_data['avg_grade']), 2) if pd.notna(student_data['avg_grade']) else 0,
+            'failed_exams': int(student_data['failed_exams']) if pd.notna(student_data['failed_exams']) else 0,
+            'missed_exams': int(student_data['missed_exams']) if pd.notna(student_data['missed_exams']) else 0,
+            'completed_exams': int(student_data['completed_exams']) if pd.notna(student_data['completed_exams']) else 0,
+            'total_paid': round(float(student_data['total_paid']), 2) if pd.notna(student_data['total_paid']) else 0,
+            'total_pending': round(float(student_data['total_pending']), 2) if pd.notna(student_data['total_pending']) else 0,
+            'total_payments': int(student_data['total_payments']) if pd.notna(student_data['total_payments']) else 0,
+            'avg_attendance_hours': round(float(student_data['avg_attendance_hours']), 2) if pd.notna(student_data['avg_attendance_hours']) else 0,
+            'total_days_present': int(student_data['total_days_present']) if pd.notna(student_data['total_days_present']) else 0,
+            'grade_distribution': grade_df.to_dict('records'),
+            'grades_over_time': time_df.to_dict('records'),
+            'total_students': 1,
+            'total_courses': int(student_data['total_courses']) if pd.notna(student_data['total_courses']) else 0,
+            'total_enrollments': int(student_data['total_courses']) if pd.notna(student_data['total_courses']) else 0,
+            'avg_grade': round(float(student_data['avg_grade']), 2) if pd.notna(student_data['avg_grade']) else 0,
+            'total_payments': round(float(student_data['total_paid']), 2) if pd.notna(student_data['total_paid']) else 0,
+            'avg_attendance': round(float(student_data['avg_attendance_hours']), 2) if pd.notna(student_data['avg_attendance_hours']) else 0,
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in get_student_analytics: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500

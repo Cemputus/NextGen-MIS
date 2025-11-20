@@ -44,27 +44,39 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(username, password);
-    
-    if (result.success) {
-      const role = result.user?.role;
-      const routes = {
-        senate: '/senate/dashboard',
-        sysadmin: '/admin/dashboard',
-        analyst: '/analyst/dashboard',
-        student: '/student/dashboard',
-        staff: '/staff/dashboard',
-        dean: '/dean/dashboard',
-        hod: '/hod/dashboard',
-        hr: '/hr/dashboard',
-        finance: '/finance/dashboard',
-      };
-      navigate(routes[role] || '/student/dashboard');
-    } else {
-      setError(result.error || 'Invalid credentials');
+    try {
+      const result = await login(username.trim(), password);
+      
+      if (result.success && result.user) {
+        const role = result.user?.role;
+        console.log('Login successful, role:', role, 'User:', result.user);
+        
+        const routes = {
+          senate: '/senate/dashboard',
+          sysadmin: '/admin/dashboard',
+          analyst: '/analyst/dashboard',
+          student: '/student/dashboard',
+          staff: '/staff/dashboard',
+          dean: '/dean/dashboard',
+          hod: '/hod/dashboard',
+          hr: '/hr/dashboard',
+          finance: '/finance/dashboard',
+        };
+        
+        const route = routes[role] || '/student/dashboard';
+        console.log('Navigating to:', route);
+        navigate(route);
+      } else {
+        const errorMsg = result.error || 'Invalid credentials. Please check your username and password.';
+        setError(errorMsg);
+        console.error('Login failed:', result.error);
+      }
+    } catch (err) {
+      console.error('Login exception:', err);
+      setError('An error occurred during login. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   if (authLoading) {
@@ -217,8 +229,11 @@ const Login = () => {
                     <p className="font-medium">
                       For students: Use Access Number and password format:{' '}
                       <code className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-mono text-xs border border-blue-200">
-                        AccessNumber@nextgen
+                        AccessNumber@ucu
                       </code>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Staff/Admin: Use username and password (e.g., admin/admin123)
                     </p>
                   </div>
                 </form>

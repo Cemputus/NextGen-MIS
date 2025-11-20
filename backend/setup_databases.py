@@ -904,7 +904,7 @@ def generate_attendance(students_df, courses_df):
     
     return pd.DataFrame(attendance)
 
-def generate_student_fees(students_df, programs_df):
+def generate_student_fees(students_df, programs_df, include_timestamps=True):
     """Generate Student Fees data using actual UCU fee structure from Fees Structure 2025"""
     from ucu_actual_data import FUNCTIONAL_FEES
     fees = []
@@ -974,7 +974,38 @@ def generate_student_fees(students_df, programs_df):
             current_year = datetime.now().year
             semester_year = current_year - random.randint(0, 3)  # Last 3 years
             
-            fees.append({
+            # Select semester and calculate semester start date
+            semester_name = random.choice(semesters)
+            if 'Jan' in semester_name or 'Easter' in semester_name:
+                semester_start_date = datetime(semester_year, 1, 15)
+            elif 'May' in semester_name or 'Trinity' in semester_name:
+                semester_start_date = datetime(semester_year, 5, 15)
+            elif 'September' in semester_name or 'Advent' in semester_name:
+                semester_start_date = datetime(semester_year, 8, 29)  # Based on image: 29-08-2025
+            else:
+                semester_start_date = datetime(semester_year, 1, 15)
+            
+            # Generate payment date (can be before or after semester start, but usually after)
+            # Payment dates range from 2 weeks before semester start to 4 months after
+            days_offset = random.randint(-14, 120)  # -14 to 120 days from semester start
+            payment_date = semester_start_date + timedelta(days=days_offset)
+            
+            # Ensure payment date is not in the future
+            if payment_date > datetime.now():
+                payment_date = datetime.now() - timedelta(days=random.randint(1, 30))
+            
+            # Generate payment timestamp (same as payment_date but with time component)
+            payment_timestamp = payment_date.replace(
+                hour=random.randint(8, 17),
+                minute=random.randint(0, 59),
+                second=random.randint(0, 59)
+            )
+            
+            # Determine payment method
+            payment_methods = ['Bank Transfer', 'Mobile Money', 'Cash', 'Credit Card', 'Cheque']
+            payment_method = random.choice(payment_methods)
+            
+            fee_record = {
                 'PaymentID': payment_id,
                 'StudentID': student_id,
                 'AmountPaid': amount_paid,
@@ -982,11 +1013,21 @@ def generate_student_fees(students_df, programs_df):
                 'TuitionInternational': tuition_info['non_national'] if not is_national else 0,
                 'FunctionalFees': functional_fee,
                 'TotalAmount': total_fee_per_semester,
-                'Semester': random.choice(semesters),
+                'Semester': semester_name,
                 'Year': semester_year,
                 'Status': status,
-                'Balance': max(0, total_fee_per_semester - amount_paid)
-            })
+                'Balance': max(0, total_fee_per_semester - amount_paid),
+                'StudentType': 'national' if is_national else 'international'
+            }
+            
+            # Add timestamp fields if requested
+            if include_timestamps:
+                fee_record['PaymentDate'] = payment_date
+                fee_record['PaymentTimestamp'] = payment_timestamp
+                fee_record['SemesterStartDate'] = semester_start_date
+                fee_record['PaymentMethod'] = payment_method
+            
+            fees.append(fee_record)
             payment_id += 1
             if payment_id > 1000:
                 break

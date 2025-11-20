@@ -107,21 +107,32 @@ export const AuthProvider = ({ children }) => {
         identifier,  // Can be Access Number, username, or email
         password 
       });
-      const { access_token, refresh_token, user } = response.data;
+      
+      const { access_token, refresh_token, user, role } = response.data;
+      
+      // Ensure user object has role (from top level or user object)
+      const userWithRole = {
+        ...user,
+        role: role || user?.role || 'student'
+      };
       
       setToken(access_token);
-      setUser(user);
+      setUser(userWithRole);
       setIsAuthenticated(true);
       
       localStorage.setItem('token', access_token);
-      localStorage.setItem('refresh_token', refresh_token);
-      localStorage.setItem('user', JSON.stringify(user));
+      if (refresh_token) {
+        localStorage.setItem('refresh_token', refresh_token);
+      }
+      localStorage.setItem('user', JSON.stringify(userWithRole));
       
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
-      return { success: true, user };
+      return { success: true, user: userWithRole };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || 'Login failed' };
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      return { success: false, error: errorMessage };
     }
   };
 

@@ -51,6 +51,18 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // UCU Branding Colors
+        ucu: {
+          blue: "#003366",      // UCU Primary Blue
+          "blue-light": "#004080",
+          "blue-dark": "#002244",
+          gold: "#FFD700",      // UCU Gold
+          "gold-light": "#FFE44D",
+          "gold-dark": "#CCAA00",
+          navy: "#1a237e",      // UCU Navy
+          "navy-light": "#283593",
+          white: "#FFFFFF",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

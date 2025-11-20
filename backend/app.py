@@ -217,19 +217,41 @@ def get_dashboard_stats():
 @app.route('/api/dashboard/students-by-department', methods=['GET'])
 @jwt_required()
 def get_students_by_department():
-    """Get student count by department with filters"""
+    """Get student count by department with role-based filtering"""
     try:
+        from flask_jwt_extended import get_jwt
+        from rbac import Role
+        
+        claims = get_jwt()
+        role_str = claims.get('role', 'student')
+        try:
+            role = Role(role_str.lower())
+        except:
+            role = Role.STUDENT
+        
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
         filters = request.args.to_dict()
         
-        # Build WHERE clause based on filters
+        # Build WHERE clause based on role and filters
         where_clauses = []
+        
+        # Role-based scoping
+        if role == Role.DEAN and claims.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {claims['faculty_id']}")
+        elif role == Role.HOD and claims.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {claims['department_id']}")
+        elif role == Role.STAFF:
+            # Staff sees their classes - filter by program/courses they teach
+            # This would need staff-course mapping in production
+            pass
+        
+        # Apply user filters
         if filters.get('faculty_id'):
-            where_clauses.append(f"dc.department IN (SELECT department_name FROM dim_department WHERE faculty_id = {filters['faculty_id']})")
+            where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
         if filters.get('department_id'):
-            where_clauses.append(f"dc.department = (SELECT department_name FROM dim_department WHERE department_id = {filters['department_id']})")
+            where_clauses.append(f"ddept.department_id = {filters['department_id']}")
         if filters.get('program_id'):
-            where_clauses.append(f"fe.student_id IN (SELECT student_id FROM dim_student WHERE program_id = {filters['program_id']})")
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
         if filters.get('semester_id'):
             where_clauses.append(f"fe.semester_id = {filters['semester_id']}")
         
@@ -237,12 +259,16 @@ def get_students_by_department():
         
         query = f"""
         SELECT 
-            dc.department,
-            COUNT(DISTINCT fe.student_id) as student_count
-        FROM fact_enrollment fe
-        JOIN dim_course dc ON fe.course_code = dc.course_code
+            ddept.department_name as department,
+            df.faculty_name as faculty,
+            COUNT(DISTINCT ds.student_id) as student_count
+        FROM dim_student ds
+        JOIN dim_program dp ON ds.program_id = dp.program_id
+        JOIN dim_department ddept ON dp.department_id = ddept.department_id
+        JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+        LEFT JOIN fact_enrollment fe ON ds.student_id = fe.student_id
         {where_clause}
-        GROUP BY dc.department
+        GROUP BY ddept.department_name, df.faculty_name
         ORDER BY student_count DESC
         """
         
@@ -251,32 +277,72 @@ def get_students_by_department():
         
         return jsonify({
             'departments': df['department'].tolist(),
+            'faculties': df['faculty'].tolist(),
             'counts': df['student_count'].tolist()
         })
     except Exception as e:
         print(f"Error in get_students_by_department: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/grades-over-time', methods=['GET'])
 @jwt_required()
 def get_grades_over_time():
-    """Get average grades over time with filters"""
+    """Get average grades over time with role-based filtering"""
     try:
+        from flask_jwt_extended import get_jwt
+        from rbac import Role
+        
+        claims = get_jwt()
+        role_str = claims.get('role', 'student')
+        try:
+            role = Role(role_str.lower())
+        except:
+            role = Role.STUDENT
+        
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
         filters = request.args.to_dict()
         
-        # Build WHERE clause
+        # Build WHERE clause based on role
         where_clauses = []
+        
+        # Role-based scoping
+        if role == Role.STAFF:
+            # Staff sees their courses - would need staff-course mapping
+            # For now, show all courses (can be filtered by program_id)
+            if filters.get('program_id'):
+                where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        elif role == Role.HOD and claims.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {claims['department_id']}")
+        elif role == Role.DEAN and claims.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {claims['faculty_id']}")
+        elif role == Role.STUDENT:
+            if claims.get('student_id'):
+                where_clauses.append(f"ds.student_id = '{claims['student_id']}'")
+            elif claims.get('access_number'):
+                where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
+        
+        # Apply user filters
         if filters.get('faculty_id'):
-            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+            where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
         if filters.get('department_id'):
-            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+            where_clauses.append(f"ddept.department_id = {filters['department_id']}")
         if filters.get('program_id'):
             where_clauses.append(f"ds.program_id = {filters['program_id']}")
         if filters.get('semester_id'):
             where_clauses.append(f"fg.semester_id = {filters['semester_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        # Join with department and faculty for role-based filtering
+        join_clause = ""
+        if role in [Role.HOD, Role.DEAN] or filters.get('faculty_id') or filters.get('department_id'):
+            join_clause = """
+            LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+            LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+            LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+            """
         
         query = f"""
         SELECT 
@@ -287,6 +353,7 @@ def get_grades_over_time():
         FROM fact_grade fg
         JOIN dim_time dt ON fg.date_key = dt.date_key
         JOIN dim_student ds ON fg.student_id = ds.student_id
+        {join_clause}
         {where_clause}
         GROUP BY dt.year, dt.month, dt.month_name
         ORDER BY dt.year, dt.month
@@ -303,36 +370,72 @@ def get_grades_over_time():
         })
     except Exception as e:
         print(f"Error in get_grades_over_time: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/payment-status', methods=['GET'])
 @jwt_required()
 def get_payment_status():
-    """Get payment status distribution with filters"""
+    """Get payment status distribution with role-based filtering"""
     try:
+        from flask_jwt_extended import get_jwt
+        from rbac import Role
+        
+        claims = get_jwt()
+        role_str = claims.get('role', 'student')
+        try:
+            role = Role(role_str.lower())
+        except:
+            role = Role.STUDENT
+        
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
         filters = request.args.to_dict()
         
-        # Build WHERE clause
+        # Build WHERE clause based on role
         where_clauses = []
+        
+        # Role-based scoping
+        if role == Role.DEAN and claims.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {claims['faculty_id']}")
+        elif role == Role.HOD and claims.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {claims['department_id']}")
+        elif role == Role.STUDENT:
+            if claims.get('student_id'):
+                where_clauses.append(f"fp.student_id = '{claims['student_id']}'")
+            elif claims.get('access_number'):
+                where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
+        
+        # Apply user filters
         if filters.get('faculty_id'):
-            where_clauses.append(f"fp.student_id IN (SELECT student_id FROM dim_student WHERE program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']})))")
+            where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
         if filters.get('department_id'):
-            where_clauses.append(f"fp.student_id IN (SELECT student_id FROM dim_student WHERE program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']}))")
+            where_clauses.append(f"ddept.department_id = {filters['department_id']}")
         if filters.get('program_id'):
-            where_clauses.append(f"fp.student_id IN (SELECT student_id FROM dim_student WHERE program_id = {filters['program_id']})")
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
         if filters.get('semester_id'):
             where_clauses.append(f"fp.semester_id = {filters['semester_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         
+        # Join with student, program, department, faculty for role-based filtering
+        join_clause = ""
+        if role in [Role.DEAN, Role.HOD] or filters.get('faculty_id') or filters.get('department_id') or role == Role.STUDENT:
+            join_clause = """
+            JOIN dim_student ds ON fp.student_id = ds.student_id
+            LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+            LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+            LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+            """
+        
         query = f"""
         SELECT 
-            status,
+            fp.status,
             COUNT(*) as count
         FROM fact_payment fp
+        {join_clause}
         {where_clause}
-        GROUP BY status
+        GROUP BY fp.status
         """
         
         df = pd.read_sql_query(text(query), engine)
@@ -344,6 +447,8 @@ def get_payment_status():
         })
     except Exception as e:
         print(f"Error in get_payment_status: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/attendance-by-course', methods=['GET'])
@@ -434,22 +539,54 @@ def get_grade_distribution():
 @app.route('/api/dashboard/top-students', methods=['GET'])
 @jwt_required()
 def get_top_students_filtered():
-    """Get top performing students with filters"""
+    """Get top performing students with role-based filtering"""
     try:
+        from flask_jwt_extended import get_jwt
+        from rbac import Role
+        
+        claims = get_jwt()
+        role_str = claims.get('role', 'student')
+        try:
+            role = Role(role_str.lower())
+        except:
+            role = Role.STUDENT
+        
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
         filters = request.args.to_dict()
         limit = int(filters.get('limit', 10))
         
-        # Build WHERE clause
+        # Build WHERE clause based on role
         where_clauses = []
+        
+        # Role-based scoping
+        if role == Role.DEAN and claims.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {claims['faculty_id']}")
+        elif role == Role.HOD and claims.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {claims['department_id']}")
+        elif role == Role.STAFF:
+            # Staff sees top students in their program/class
+            if filters.get('program_id'):
+                where_clauses.append(f"ds.program_id = {filters['program_id']}")
+            # In production, would filter by staff-course mapping
+        
+        # Apply user filters
         if filters.get('faculty_id'):
-            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+            where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
         if filters.get('department_id'):
-            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+            where_clauses.append(f"ddept.department_id = {filters['department_id']}")
         if filters.get('program_id'):
             where_clauses.append(f"ds.program_id = {filters['program_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        # Join with program, department, faculty for role-based filtering
+        join_clause = ""
+        if role in [Role.DEAN, Role.HOD] or filters.get('faculty_id') or filters.get('department_id'):
+            join_clause = """
+            LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+            LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+            LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+            """
         
         query = f"""
         SELECT 
@@ -457,6 +594,7 @@ def get_top_students_filtered():
             AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade
         FROM fact_grade fg
         JOIN dim_student ds ON fg.student_id = ds.student_id
+        {join_clause}
         {where_clause}
         GROUP BY ds.student_id, ds.first_name, ds.last_name
         HAVING AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) IS NOT NULL
@@ -473,34 +611,74 @@ def get_top_students_filtered():
         })
     except Exception as e:
         print(f"Error in get_top_students_filtered: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/attendance-trends', methods=['GET'])
 @jwt_required()
 def get_attendance_trends():
-    """Get attendance trends over time"""
+    """Get attendance trends over time with role-based filtering"""
     try:
+        from flask_jwt_extended import get_jwt
+        from rbac import Role
+        
+        claims = get_jwt()
+        role_str = claims.get('role', 'student')
+        try:
+            role = Role(role_str.lower())
+        except:
+            role = Role.STUDENT
+        
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
         filters = request.args.to_dict()
         
-        # Build WHERE clause
+        # Build WHERE clause based on role
         where_clauses = []
+        
+        # Role-based scoping
+        if role == Role.STAFF:
+            # Staff sees attendance in their courses
+            if filters.get('program_id'):
+                where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        elif role == Role.HOD and claims.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {claims['department_id']}")
+        elif role == Role.DEAN and claims.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {claims['faculty_id']}")
+        elif role == Role.STUDENT:
+            if claims.get('student_id'):
+                where_clauses.append(f"fa.student_id = '{claims['student_id']}'")
+            elif claims.get('access_number'):
+                where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
+        
+        # Apply user filters
         if filters.get('faculty_id'):
-            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id IN (SELECT department_id FROM dim_department WHERE faculty_id = {filters['faculty_id']}))")
+            where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
         if filters.get('department_id'):
-            where_clauses.append(f"ds.program_id IN (SELECT program_id FROM dim_program WHERE department_id = {filters['department_id']})")
+            where_clauses.append(f"ddept.department_id = {filters['department_id']}")
         if filters.get('program_id'):
             where_clauses.append(f"ds.program_id = {filters['program_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         
+        # Join with student, program, department, faculty for role-based filtering
+        join_clause = ""
+        if role in [Role.DEAN, Role.HOD, Role.STUDENT] or filters.get('faculty_id') or filters.get('department_id'):
+            join_clause = """
+            JOIN dim_student ds ON fa.student_id = ds.student_id
+            LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+            LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+            LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+            """
+        
         query = f"""
         SELECT 
             CONCAT(dt.month_name, ' ', CAST(dt.year AS CHAR)) as period,
-            AVG(fa.total_hours) as avg_attendance
+            AVG(fa.total_hours) as avg_attendance,
+            AVG(fa.days_present) as avg_days_present
         FROM fact_attendance fa
         JOIN dim_time dt ON fa.date_key = dt.date_key
-        JOIN dim_student ds ON fa.student_id = ds.student_id
+        {join_clause}
         {where_clause}
         GROUP BY dt.year, dt.month, dt.month_name
         ORDER BY dt.year, dt.month
@@ -511,10 +689,13 @@ def get_attendance_trends():
         
         return jsonify({
             'periods': df['period'].tolist(),
-            'attendance': df['avg_attendance'].round(2).tolist()
+            'attendance': df['avg_attendance'].round(2).tolist(),
+            'days_present': df['avg_days_present'].round(2).tolist()
         })
     except Exception as e:
         print(f"Error in get_attendance_trends: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/predict-performance', methods=['POST'])

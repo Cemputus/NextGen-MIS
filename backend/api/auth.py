@@ -108,6 +108,7 @@ def login():
                 return jsonify({
                     'access_token': access_token,
                     'refresh_token': refresh_token,
+                    'role': 'student',  # Add role at top level for frontend
                     'user': {
                         'id': user_data['student_id'],
                         'username': identifier.upper(),
@@ -137,6 +138,7 @@ def login():
                 return jsonify({
                     'access_token': access_token,
                     'refresh_token': refresh_token,
+                    'role': user_info['role'],  # Add role at top level for frontend
                     'user': {
                         'id': identifier_lower,
                         'username': identifier_lower,

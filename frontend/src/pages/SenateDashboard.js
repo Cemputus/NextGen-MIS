@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Button } from '../components/ui/button';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
-import Charts from '../components/Charts';
+import RoleBasedCharts from '../components/RoleBasedCharts';
 import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
@@ -110,7 +110,7 @@ const SenateDashboard = () => {
                   <CardDescription>Comprehensive analytics across all faculties</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Charts data={stats} filters={filters} type="institution" />
+                  <RoleBasedCharts filters={filters} type="institution" />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -122,7 +122,7 @@ const SenateDashboard = () => {
                   <CardDescription>Institution-wide academic metrics and trends</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Charts data={stats} filters={filters} type="institution" />
+                  <RoleBasedCharts filters={filters} type="institution" />
                 </CardContent>
               </Card>
             </TabsContent>

@@ -317,8 +317,29 @@ class ETLPipeline:
                 payments_silver['year'] = pd.to_numeric(payments_silver['Year'], errors='coerce').fillna(datetime.now().year)
             else:
                 payments_silver['year'] = datetime.now().year
-            payments_silver['payment_date'] = pd.to_datetime(datetime.now(), errors='coerce')
-            payments_silver['payment_method'] = 'Bank Transfer'
+            # Extract payment date/timestamp
+            if 'PaymentDate' in payments_silver.columns:
+                payments_silver['payment_date'] = pd.to_datetime(payments_silver['PaymentDate'], errors='coerce')
+            elif 'PaymentTimestamp' in payments_silver.columns:
+                payments_silver['payment_date'] = pd.to_datetime(payments_silver['PaymentTimestamp'], errors='coerce')
+            else:
+                payments_silver['payment_date'] = pd.to_datetime(datetime.now(), errors='coerce')
+            
+            # Extract payment timestamp (with time component)
+            if 'PaymentTimestamp' in payments_silver.columns:
+                payments_silver['payment_timestamp'] = pd.to_datetime(payments_silver['PaymentTimestamp'], errors='coerce')
+            elif 'PaymentDate' in payments_silver.columns:
+                payments_silver['payment_timestamp'] = pd.to_datetime(payments_silver['PaymentDate'], errors='coerce')
+            else:
+                payments_silver['payment_timestamp'] = pd.to_datetime(datetime.now(), errors='coerce')
+            
+            # Extract semester start date
+            if 'SemesterStartDate' in payments_silver.columns:
+                payments_silver['semester_start_date'] = pd.to_datetime(payments_silver['SemesterStartDate'], errors='coerce')
+            else:
+                payments_silver['semester_start_date'] = None  # Will be calculated in load phase
+            
+            payments_silver['payment_method'] = payments_silver.get('PaymentMethod', 'Bank Transfer')
             if 'Status' in payments_silver.columns:
                 payments_silver['status'] = payments_silver['Status']
             else:
@@ -329,7 +350,24 @@ class ETLPipeline:
         elif not bronze_data['payments_csv'].empty:
             payments_silver = bronze_data['payments_csv'].copy()
             payments_silver = payments_silver.fillna('')
-            payments_silver['payment_date'] = pd.to_datetime(payments_silver.get('payment_date', datetime.now()), errors='coerce')
+            
+            # Extract payment date/timestamp
+            if 'payment_timestamp' in payments_silver.columns:
+                payments_silver['payment_date'] = pd.to_datetime(payments_silver['payment_timestamp'], errors='coerce')
+                payments_silver['payment_timestamp'] = pd.to_datetime(payments_silver['payment_timestamp'], errors='coerce')
+            elif 'payment_date' in payments_silver.columns:
+                payments_silver['payment_date'] = pd.to_datetime(payments_silver['payment_date'], errors='coerce')
+                payments_silver['payment_timestamp'] = payments_silver['payment_date']
+            else:
+                payments_silver['payment_date'] = pd.to_datetime(datetime.now(), errors='coerce')
+                payments_silver['payment_timestamp'] = pd.to_datetime(datetime.now(), errors='coerce')
+            
+            # Extract semester start date
+            if 'semester_start_date' in payments_silver.columns:
+                payments_silver['semester_start_date'] = pd.to_datetime(payments_silver['semester_start_date'], errors='coerce')
+            else:
+                payments_silver['semester_start_date'] = None  # Will be calculated in load phase
+            
             payments_silver['amount'] = pd.to_numeric(payments_silver.get('amount', 0), errors='coerce').fillna(0)
             # Extract year if present
             if 'year' in payments_silver.columns:
@@ -340,6 +378,9 @@ class ETLPipeline:
             payments_silver['tuition_national'] = pd.to_numeric(payments_silver.get('tuition_national', 0), errors='coerce').fillna(0)
             payments_silver['tuition_international'] = pd.to_numeric(payments_silver.get('tuition_international', 0), errors='coerce').fillna(0)
             payments_silver['functional_fees'] = pd.to_numeric(payments_silver.get('functional_fees', 0), errors='coerce').fillna(0)
+            
+            # Extract payment method
+            payments_silver['payment_method'] = payments_silver.get('payment_method', 'Bank Transfer')
         else:
             payments_silver = pd.DataFrame()
         
@@ -813,6 +854,12 @@ class ETLPipeline:
                     payment_method VARCHAR(50),
                     status VARCHAR(20),
                     student_type VARCHAR(20) DEFAULT 'national',
+                    payment_timestamp DATETIME,
+                    semester_start_date DATE,
+                    deadline_met BOOLEAN DEFAULT FALSE,
+                    deadline_type VARCHAR(50),
+                    weeks_from_deadline DECIMAL(5,2),
+                    late_penalty DECIMAL(15,2) DEFAULT 0,
                     FOREIGN KEY (student_id) REFERENCES dim_student(student_id) ON DELETE CASCADE,
                     FOREIGN KEY (date_key) REFERENCES dim_time(date_key) ON DELETE CASCADE,
                     FOREIGN KEY (semester_id) REFERENCES dim_semester(semester_id) ON DELETE CASCADE,
@@ -820,7 +867,10 @@ class ETLPipeline:
                     INDEX idx_date (date_key),
                     INDEX idx_semester (semester_id),
                     INDEX idx_year (year),
-                    INDEX idx_status (status)
+                    INDEX idx_status (status),
+                    INDEX idx_payment_timestamp (payment_timestamp),
+                    INDEX idx_deadline_met (deadline_met),
+                    INDEX idx_deadline_type (deadline_type)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """))
             
@@ -935,6 +985,7 @@ class ETLPipeline:
         # Fact_Payment
         payments = silver_data['payments'].copy()
         payments['date_key'] = pd.to_datetime(payments['payment_date'], errors='coerce').dt.strftime('%Y%m%d').fillna('')
+        
         # Map UCU semester names to semester_id
         # UCU semesters: Jan (Easter Semester), May (Trinity Semester), September (Advent)
         def map_ucu_semester(semester_str):
@@ -978,10 +1029,159 @@ class ETLPipeline:
             lambda row: 'international' if row['tuition_international'] > 0 else 'national', axis=1
         )
         
+        # Extract payment timestamp
+        if 'payment_timestamp' in payments.columns:
+            payments['payment_timestamp'] = pd.to_datetime(payments['payment_timestamp'], errors='coerce')
+        elif 'payment_date' in payments.columns:
+            payments['payment_timestamp'] = pd.to_datetime(payments['payment_date'], errors='coerce')
+        else:
+            payments['payment_timestamp'] = pd.to_datetime(datetime.now())
+        
+        # Extract semester start date for deadline calculation
+        if 'semester_start_date' in payments.columns:
+            payments['semester_start_date'] = pd.to_datetime(payments['semester_start_date'], errors='coerce')
+        else:
+            # Default semester start dates based on semester and year
+            def get_semester_start_date(row):
+                semester_id = row['semester_id']
+                year = int(row['year']) if pd.notna(row['year']) else datetime.now().year
+                if semester_id == 1:  # Jan (Easter)
+                    return pd.Timestamp(f'{year}-01-15')
+                elif semester_id == 2:  # May (Trinity)
+                    return pd.Timestamp(f'{year}-05-15')
+                elif semester_id == 3:  # September (Advent)
+                    return pd.Timestamp(f'{year}-08-29')  # Based on the image provided
+                else:
+                    return pd.Timestamp(f'{year}-01-15')
+            payments['semester_start_date'] = payments.apply(get_semester_start_date, axis=1)
+        
+        # Calculate deadline compliance using payment deadlines utility
+        try:
+            import sys
+            from pathlib import Path
+            # Add backend directory to path for imports
+            backend_dir = Path(__file__).parent
+            if str(backend_dir) not in sys.path:
+                sys.path.insert(0, str(backend_dir))
+            
+            from utils.payment_deadlines import calculate_payment_deadlines, get_current_deadline_status
+            from datetime import timedelta
+            
+            def check_deadline_compliance(row):
+                """Check if payment meets deadline requirements"""
+                try:
+                    payment_date = pd.to_datetime(row['payment_timestamp'])
+                    semester_start = pd.to_datetime(row['semester_start_date'])
+                    
+                    if pd.isna(payment_date) or pd.isna(semester_start):
+                        return {
+                            'deadline_met': False,
+                            'deadline_type': None,
+                            'weeks_from_deadline': None,
+                            'late_penalty': 0
+                        }
+                    
+                    # Calculate deadlines for this semester
+                    semester_start_str = semester_start.strftime('%Y-%m-%d')
+                    deadlines = calculate_payment_deadlines(semester_start_str)
+                    
+                    # Find which deadline this payment relates to
+                    deadline_met = False
+                    deadline_type = None
+                    weeks_from_deadline = None
+                    late_penalty = 0
+                    
+                    for deadline in deadlines:
+                        deadline_date = pd.to_datetime(deadline['deadline_date'], format='%d-%m-%Y')
+                        weeks_from_start = deadline['weeks_from_semester_start']
+                        
+                        # Calculate weeks from deadline
+                        days_diff = (payment_date - deadline_date).days
+                        weeks_diff = days_diff / 7.0
+                        
+                        # Check if payment is before or on deadline
+                        if payment_date <= deadline_date:
+                            deadline_met = True
+                            deadline_type = deadline['deadline_type']
+                            weeks_from_deadline = -weeks_diff  # Negative means before deadline
+                            break
+                        elif deadline_type is None:
+                            # Payment is after this deadline, check next one
+                            deadline_type = deadline['deadline_type']
+                            weeks_from_deadline = weeks_diff
+                            
+                            # Calculate late penalty if applicable
+                            if 'penalty_percentage' in deadline:
+                                penalty_pct = deadline['penalty_percentage']
+                                # Calculate penalty on outstanding amount
+                                total_required = row.get('tuition_national', 0) + row.get('tuition_international', 0) + row.get('functional_fees', 0)
+                                amount_paid = row.get('amount', 0)
+                                outstanding = max(0, total_required - amount_paid)
+                                late_penalty = outstanding * (penalty_pct / 100)
+                    
+                    # If payment is after all deadlines, it's late
+                    if not deadline_met:
+                        # Find the latest deadline that was passed
+                        if deadline_type and 'late_penalty' in deadline_type:
+                            # Already calculated penalty above
+                            pass
+                        else:
+                            # Calculate penalty based on latest deadline
+                            latest_deadline = deadlines[-1]
+                            if 'penalty_percentage' in latest_deadline:
+                                total_required = row.get('tuition_national', 0) + row.get('tuition_international', 0) + row.get('functional_fees', 0)
+                                amount_paid = row.get('amount', 0)
+                                outstanding = max(0, total_required - amount_paid)
+                                late_penalty = outstanding * (latest_deadline['penalty_percentage'] / 100)
+                            # Set deadline_type to latest if not set
+                            if not deadline_type:
+                                deadline_type = latest_deadline['deadline_type']
+                                # Calculate weeks from latest deadline
+                                latest_deadline_date = pd.to_datetime(latest_deadline['deadline_date'], format='%d-%m-%Y')
+                                days_diff = (payment_date - latest_deadline_date).days
+                                weeks_from_deadline = days_diff / 7.0
+                    
+                    return {
+                        'deadline_met': deadline_met,
+                        'deadline_type': deadline_type,
+                        'weeks_from_deadline': round(weeks_from_deadline, 2) if weeks_from_deadline is not None else None,
+                        'late_penalty': round(late_penalty, 2)
+                    }
+                except Exception as e:
+                    self.logger.warning(f"Error checking deadline compliance: {e}")
+                    return {
+                        'deadline_met': False,
+                        'deadline_type': None,
+                        'weeks_from_deadline': None,
+                        'late_penalty': 0
+                    }
+            
+            # Apply deadline checking to each payment
+            deadline_results = payments.apply(check_deadline_compliance, axis=1)
+            payments['deadline_met'] = deadline_results.apply(lambda x: x['deadline_met'])
+            payments['deadline_type'] = deadline_results.apply(lambda x: x['deadline_type'])
+            payments['weeks_from_deadline'] = deadline_results.apply(lambda x: x['weeks_from_deadline'])
+            payments['late_penalty'] = deadline_results.apply(lambda x: x['late_penalty'])
+            
+        except ImportError:
+            self.logger.warning("Payment deadlines utility not found, skipping deadline compliance checking")
+            payments['deadline_met'] = False
+            payments['deadline_type'] = None
+            payments['weeks_from_deadline'] = None
+            payments['late_penalty'] = 0
+        except Exception as e:
+            self.logger.warning(f"Error in deadline compliance checking: {e}")
+            payments['deadline_met'] = False
+            payments['deadline_type'] = None
+            payments['weeks_from_deadline'] = None
+            payments['late_penalty'] = 0
+        
         # Filter out rows with invalid dates
         fact_payment_cols = ['payment_id', 'student_id', 'date_key', 'semester_id', 'year',
                             'tuition_national', 'tuition_international', 'functional_fees',
-                            'amount', 'payment_method', 'status', 'student_type']
+                            'amount', 'payment_method', 'status', 'student_type',
+                            'payment_timestamp', 'semester_start_date', 'deadline_met',
+                            'deadline_type', 'weeks_from_deadline', 'late_penalty']
         available_cols = [col for col in fact_payment_cols if col in payments.columns]
         fact_payment = payments[available_cols].copy()
         fact_payment = fact_payment[fact_payment['date_key'] != '']  # Remove invalid dates

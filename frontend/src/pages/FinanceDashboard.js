@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ModernStatsCards from '../components/ModernStatsCards';
-import Charts from '../components/Charts';
+import RoleBasedCharts from '../components/RoleBasedCharts';
 import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
@@ -101,7 +101,7 @@ const FinanceDashboard = () => {
                   <CardDescription>Total revenue by period, program, and student type</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Charts data={stats} filters={filters} type="finance" />
+                  <RoleBasedCharts filters={filters} type="finance" />
                 </CardContent>
               </Card>
             </TabsContent>
