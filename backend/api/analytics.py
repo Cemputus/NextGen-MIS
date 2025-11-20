@@ -295,6 +295,7 @@ def get_filter_options():
         # Get filter parameters for cascading
         faculty_id = request.args.get('faculty_id', type=int)
         department_id = request.args.get('department_id', type=int)
+        program_id = request.args.get('program_id', type=int)
         
         options = {}
         
@@ -305,6 +306,8 @@ def get_filter_options():
                 engine
             )
             options['faculties'] = faculties.to_dict('records')
+        else:
+            options['faculties'] = []
         
         # Get departments - filtered by faculty if provided
         dept_query = """
@@ -321,7 +324,7 @@ def get_filter_options():
             dept_query += " WHERE " + " AND ".join(dept_where)
         dept_query += " ORDER BY d.department_name"
         
-        departments = pd.read_sql_query(dept_query, engine)
+        departments = pd.read_sql_query(text(dept_query), engine)
         options['departments'] = departments.to_dict('records')
         
         # Get programs - filtered by department if provided, or by faculty if department not provided
@@ -340,14 +343,23 @@ def get_filter_options():
             prog_query += " WHERE " + " AND ".join(prog_where)
         prog_query += " ORDER BY p.program_name"
         
-        programs = pd.read_sql_query(prog_query, engine)
+        programs = pd.read_sql_query(text(prog_query), engine)
         options['programs'] = programs.to_dict('records')
         
-        # Get courses
-        courses = pd.read_sql_query(
-            "SELECT DISTINCT course_code, course_name FROM dim_course ORDER BY course_code",
-            engine
-        )
+        # Get courses - filtered by department if provided
+        if department_id:
+            # Filter courses by department
+            course_query = """
+                SELECT DISTINCT c.course_code, c.course_name
+                FROM dim_course c
+                WHERE c.department = (SELECT department_name FROM dim_department WHERE department_id = :dept_id)
+                ORDER BY c.course_code
+            """
+            courses = pd.read_sql_query(text(course_query), engine, params={'dept_id': department_id})
+        else:
+            # If no department filter, get all courses
+            course_query = "SELECT DISTINCT course_code, course_name FROM dim_course ORDER BY course_code"
+            courses = pd.read_sql_query(text(course_query), engine)
         options['courses'] = courses.to_dict('records')
         
         # Get semesters

@@ -1,6 +1,6 @@
 /**
- * Global Filter Panel - Smooth, Professional UI with Advanced Styling
- * Simple, independent filters (no cascading)
+ * Global Filter Panel - Smooth, Professional UI with Synced Filters
+ * Filters sync: selecting faculty filters departments, selecting department filters programs
  */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -26,12 +26,18 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Load all filter options independently
-  const loadFilterOptions = async () => {
+  // Load filter options with current filter values for syncing
+  const loadFilterOptions = async (currentFilters = {}) => {
     setLoading(true);
     try {
+      const params = {};
+      if (currentFilters.faculty_id) params.faculty_id = currentFilters.faculty_id;
+      if (currentFilters.department_id) params.department_id = currentFilters.department_id;
+      if (currentFilters.program_id) params.program_id = currentFilters.program_id;
+      
       const res = await axios.get('/api/analytics/filter-options', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        params
       });
       setFilterOptions(res.data);
     } catch (err) {
@@ -42,18 +48,35 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
   };
 
   useEffect(() => {
-    loadFilterOptions();
-  }, []);
+    loadFilterOptions(filters);
+  }, [filters.faculty_id, filters.department_id, filters.program_id]);
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters };
+    
+    // Clear child filters when parent changes
+    if (key === 'faculty_id') {
+      // Clear department and program when faculty changes
+      delete newFilters.department_id;
+      delete newFilters.program_id;
+    } else if (key === 'department_id') {
+      // Clear program when department changes
+      delete newFilters.program_id;
+    }
+    
     if (value === '' || value === null) {
       delete newFilters[key];
     } else {
       newFilters[key] = value;
     }
+    
     setFilters(newFilters);
     onFilterChange(newFilters);
+    
+    // Reload filter options after a short delay to allow state to update
+    setTimeout(() => {
+      loadFilterOptions(newFilters);
+    }, 100);
   };
 
   const handleSearch = () => {
@@ -72,6 +95,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
     setFilters({});
     setSearchTerm('');
     onFilterChange({});
+    loadFilterOptions({});
   };
 
   const activeFiltersCount = Object.keys(filters).filter(k => filters[k]).length;
@@ -93,7 +117,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Filters</h3>
-                  <p className="text-sm text-muted-foreground">Refine your search and analysis</p>
+                  <p className="text-sm text-muted-foreground">Synced filters - selections cascade automatically</p>
                 </div>
               </div>
               {activeFiltersCount > 0 && (
@@ -125,7 +149,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
               </Button>
             </div>
 
-            {/* Filter Grid - All Independent */}
+            {/* Filter Grid - Synced Filters */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
               <Select
                 value={filters.faculty_id || ''}
@@ -144,10 +168,14 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
               <Select
                 value={filters.department_id || ''}
                 onChange={(e) => handleFilterChange('department_id', e.target.value || null)}
-                disabled={loading}
-                className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
+                disabled={loading || !filters.faculty_id}
+                className={`h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500 ${
+                  !filters.faculty_id ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
-                <option value="">All Departments</option>
+                <option value="">
+                  {filters.faculty_id ? 'All Departments' : 'Select Faculty First'}
+                </option>
                 {filterOptions.departments?.map(d => (
                   <option key={d.department_id} value={d.department_id}>
                     {d.department_name}
@@ -158,10 +186,14 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
               <Select
                 value={filters.program_id || ''}
                 onChange={(e) => handleFilterChange('program_id', e.target.value || null)}
-                disabled={loading}
-                className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
+                disabled={loading || (!filters.department_id && !filters.faculty_id)}
+                className={`h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500 ${
+                  (!filters.department_id && !filters.faculty_id) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
-                <option value="">All Programs</option>
+                <option value="">
+                  {(filters.department_id || filters.faculty_id) ? 'All Programs' : 'Select Department First'}
+                </option>
                 {filterOptions.programs?.map(p => (
                   <option key={p.program_id} value={p.program_id}>
                     {p.program_name}
@@ -178,7 +210,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
                 <option value="">All Courses</option>
                 {filterOptions.courses?.map(c => (
                   <option key={c.course_code} value={c.course_code}>
-                    {c.course_code}
+                    {c.course_code} - {c.course_name}
                   </option>
                 ))}
               </Select>
@@ -237,13 +269,17 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
                   <span className="text-sm font-medium text-gray-700">Active filters:</span>
                   {Object.entries(filters).map(([key, value]) => {
                     if (!value) return null;
+                    const displayValue = filterOptions.faculties?.find(f => f.faculty_id == value)?.faculty_name ||
+                                         filterOptions.departments?.find(d => d.department_id == value)?.department_name ||
+                                         filterOptions.programs?.find(p => p.program_id == value)?.program_name ||
+                                         value;
                     return (
                       <Badge
                         key={key}
                         variant="secondary"
                         className="gap-1 pr-1 bg-blue-100 text-blue-700 border-blue-200 font-medium"
                       >
-                        {key}: {value}
+                        {key.replace('_', ' ')}: {displayValue}
                         <Button
                           variant="ghost"
                           size="icon"
