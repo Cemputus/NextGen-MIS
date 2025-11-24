@@ -195,18 +195,23 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         }));
       }
       
-      // Process Attendance/Payment Trends
+      // Process Attendance/Payment Trends - Enhanced with comprehensive data
       if (isFinancePage || role === 'finance' || role === 'senate') {
         const trendsRes = results[resultIndex++];
         data.paymentTrends = trendsRes.data.periods?.map((period, idx) => ({
           period,
-          amount: trendsRes.data.amounts?.[idx] || 0
+          amount: trendsRes.data.amounts?.[idx] || 0,
+          completed_payments: trendsRes.data.completed_payments?.[idx] || 0,
+          pending_payments: trendsRes.data.pending_payments?.[idx] || 0,
         })) || [];
       } else if (role !== 'finance' && role !== 'senate') {
         const attendanceRes = results[resultIndex++];
         data.attendance = attendanceRes.data.periods?.map((period, idx) => ({
           period,
-          attendance: attendanceRes.data.attendance?.[idx] || 0
+          attendance: attendanceRes.data.attendance?.[idx] || 0,
+          days_present: attendanceRes.data.days_present?.[idx] || 0,
+          attendance_rate: attendanceRes.data.attendance_rate?.[idx] || 0,
+          total_students: attendanceRes.data.total_students?.[idx] || 0,
         })) || [];
       }
       
