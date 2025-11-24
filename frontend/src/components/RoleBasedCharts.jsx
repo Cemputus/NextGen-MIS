@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AdvancedTrendChart from './AdvancedTrendChart';
 
 // UCU Branding Colors
 const UCU_COLORS = {
@@ -73,8 +74,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         );
       }
       
-      // Grades Over Time (role-specific scope)
-      if (role !== 'finance') {
+      // Grades Over Time (role-specific scope) - NOT for Finance pages
+      if (!isFinancePage && role !== 'finance') {
         requests.push(
           axios.get('/api/dashboard/grades-over-time', {
             headers: { Authorization: `Bearer ${token}` },
@@ -83,7 +84,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         );
       }
       
-      // Payment Status (for Dean, HOD, Student, Finance)
+      // Payment Status (for Dean, HOD, Student, Finance, Senate)
       if (['dean', 'hod', 'student', 'finance', 'senate'].includes(role)) {
         requests.push(
           axios.get('/api/dashboard/payment-status', {
@@ -93,8 +94,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         );
       }
       
-      // Grade Distribution (NOT for finance)
-      if (role !== 'finance') {
+      // Grade Distribution (NOT for finance) - NOT for Finance pages
+      if (!isFinancePage && role !== 'finance') {
         requests.push(
           axios.get('/api/dashboard/grade-distribution', {
             headers: { Authorization: `Bearer ${token}` },
@@ -103,8 +104,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         );
       }
       
-      // Top Students (role-specific scope)
-      if (['senate', 'dean', 'hod', 'staff'].includes(role)) {
+      // Top Students (role-specific scope) - NOT for Finance pages
+      if (!isFinancePage && ['senate', 'dean', 'hod', 'staff'].includes(role)) {
         requests.push(
           axios.get('/api/dashboard/top-students', {
             headers: { Authorization: `Bearer ${token}` },
@@ -113,15 +114,15 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         );
       }
       
-      // Attendance Trends (NOT for finance, but finance gets payment trends)
-      if (role === 'finance') {
+      // Attendance Trends (NOT for finance/senate, but finance/senate gets payment trends)
+      if (role === 'finance' || role === 'senate') {
         requests.push(
           axios.get('/api/dashboard/payment-trends', {
             headers: { Authorization: `Bearer ${token}` },
             params: filters
           }).catch(() => ({ data: { periods: [], amounts: [] } }))
         );
-      } else if (role !== 'finance') {
+      } else if (role !== 'finance' && role !== 'senate') {
         requests.push(
           axios.get('/api/dashboard/attendance-trends', {
             headers: { Authorization: `Bearer ${token}` },
@@ -153,12 +154,17 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         })) || [];
       }
       
-      // Process Grades Over Time
-      if (role !== 'finance') {
+      // Process Grades Over Time (NOT for Finance pages) - Enhanced with comprehensive data
+      if (!isFinancePage && role !== 'finance') {
         const gradesRes = results[resultIndex++];
         data.gradesOverTime = gradesRes.data.periods?.map((period, idx) => ({
           period,
-          grade: gradesRes.data.grades?.[idx] || 0
+          grade: gradesRes.data.grades?.[idx] || 0,
+          missed_exams: gradesRes.data.missed_exams?.[idx] || 0,
+          failed_exams: gradesRes.data.failed_exams?.[idx] || 0,
+          completed_exams: gradesRes.data.completed_exams?.[idx] || 0,
+          pass_rate: gradesRes.data.pass_rate?.[idx] || 0,
+          total_students: gradesRes.data.total_students?.[idx] || 0,
         })) || [];
       }
       
@@ -171,8 +177,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         })) || [];
       }
       
-      // Process Grade Distribution
-      if (role !== 'finance') {
+      // Process Grade Distribution (NOT for Finance pages)
+      if (!isFinancePage && role !== 'finance') {
         const gradeDistRes = results[resultIndex++];
         data.gradeDistribution = gradeDistRes.data.grades?.map((grade, idx) => ({
           name: grade,
@@ -180,23 +186,23 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         })) || [];
       }
       
-      // Process Top Students
-      if (['senate', 'dean', 'hod', 'staff'].includes(role)) {
+      // Process Top Students (NOT for Finance pages)
+      if (!isFinancePage && ['senate', 'dean', 'hod', 'staff'].includes(role)) {
         const topStudentsRes = results[resultIndex++];
-        data.topStudents = topStudentsRes.data.students?.slice(0, 10).map((student, idx) => ({
-          name: student.length > 15 ? student.substring(0, 15) + '...' : student,
+        data.topStudents = (topStudentsRes.data.students || []).slice(0, 10).map((student, idx) => ({
+          name: student && student.length > 15 ? student.substring(0, 15) + '...' : (student || 'Unknown'),
           grade: topStudentsRes.data.grades?.[idx] || 0
-        })) || [];
+        }));
       }
       
       // Process Attendance/Payment Trends
-      if (role === 'finance') {
+      if (isFinancePage || role === 'finance' || role === 'senate') {
         const trendsRes = results[resultIndex++];
         data.paymentTrends = trendsRes.data.periods?.map((period, idx) => ({
           period,
           amount: trendsRes.data.amounts?.[idx] || 0
         })) || [];
-      } else if (role !== 'finance') {
+      } else if (role !== 'finance' && role !== 'senate') {
         const attendanceRes = results[resultIndex++];
         data.attendance = attendanceRes.data.periods?.map((period, idx) => ({
           period,
@@ -227,11 +233,26 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
   }
 
   const role = user?.role || 'student';
+  
+  // If type is finance, only show finance-related charts
+  const isFinancePage = type === 'finance';
+  
+  // Ensure all arrays are initialized to prevent undefined errors
+  const safeChartData = {
+    studentDistribution: chartData.studentDistribution || [],
+    gradesOverTime: chartData.gradesOverTime || [],
+    paymentStatus: chartData.paymentStatus || [],
+    attendance: chartData.attendance || [],
+    gradeDistribution: chartData.gradeDistribution || [],
+    topStudents: chartData.topStudents || [],
+    paymentTrends: chartData.paymentTrends || [],
+    studentPaymentBreakdown: chartData.studentPaymentBreakdown || null,
+  };
 
   return (
     <div className="space-y-6">
-      {/* Student Distribution by Department - Senate, Dean, HOD, Staff, Analyst */}
-      {['senate', 'dean', 'hod', 'staff', 'analyst'].includes(role) && (
+      {/* Student Distribution by Department - Senate, Dean, HOD, Staff, Analyst (NOT for Finance) */}
+      {!isFinancePage && ['senate', 'dean', 'hod', 'staff', 'analyst'].includes(role) && (
         <Card className="bg-gradient-to-br from-white to-blue-50/50 border-blue-200/50 shadow-lg" style={{ borderLeftColor: UCU_COLORS.blue, borderLeftWidth: '4px' }}>
           <CardHeader>
             <CardTitle style={{ color: UCU_COLORS.blue }}>Student Distribution by Department</CardTitle>
@@ -243,10 +264,10 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[350px]" data-chart-title="Student Distribution by Department">
-              {chartData.studentDistribution.length > 0 ? (
+            <div className="h-[280px]" data-chart-title="Student Distribution by Department">
+              {safeChartData.studentDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData.studentDistribution}>
+                  <BarChart data={safeChartData.studentDistribution}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis 
                       dataKey="name" 
@@ -285,11 +306,11 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Average Grades Over Time - Role-specific */}
-        {role !== 'finance' && (
+        {/* Average Grades Over Time - Role-specific (NOT for Finance) */}
+        {!isFinancePage && role !== 'finance' && (
           <Card className="bg-gradient-to-br from-white to-purple-50/50 border-purple-200/50 shadow-lg" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '4px' }}>
             <CardHeader>
-              <CardTitle style={{ color: UCU_COLORS.navy }}>Average Grades Over Time</CardTitle>
+              <CardTitle style={{ color: UCU_COLORS.navy }}>Trend Analysis of Grades Over Time</CardTitle>
               <CardDescription>
                 {role === 'staff' && 'Your courses performance over time'}
                 {role === 'hod' && 'Your department performance over time'}
@@ -299,10 +320,10 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" data-chart-title="Average Grades Over Time">
-                {chartData.gradesOverTime.length > 0 ? (
+              <div className="h-[250px]" data-chart-title="Trend Analysis of Grades Over Time">
+                {safeChartData.gradesOverTime.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData.gradesOverTime}>
+                    <LineChart data={safeChartData.gradesOverTime}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis 
                         dataKey="period" 
@@ -366,10 +387,10 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" data-chart-title={role === 'student' ? 'My Payment Status' : 'Payment Status Distribution'}>
-                {chartData.paymentStatus.length > 0 ? (
+              <div className="h-[250px]" data-chart-title={role === 'student' ? 'My Payment Status' : 'Payment Status Distribution'}>
+                {safeChartData.paymentStatus.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    {role === 'student' && chartData.studentPaymentBreakdown ? (
+                    {role === 'student' && safeChartData.studentPaymentBreakdown ? (
                       // Student-specific payment breakdown with amounts
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -395,8 +416,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                         <PieChart>
                           <Pie
                             data={[
-                              { name: 'Paid', value: chartData.studentPaymentBreakdown.total_paid || 0 },
-                              { name: 'Pending', value: chartData.studentPaymentBreakdown.total_pending || 0 }
+                              { name: 'Paid', value: safeChartData.studentPaymentBreakdown.total_paid || 0 },
+                              { name: 'Pending', value: safeChartData.studentPaymentBreakdown.total_pending || 0 }
                             ]}
                             cx="50%"
                             cy="50%"
@@ -422,7 +443,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                     ) : (
                       <PieChart>
                         <Pie
-                          data={chartData.paymentStatus}
+                          data={safeChartData.paymentStatus}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
@@ -431,7 +452,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                           fill="#8884d8"
                           dataKey="value"
                         >
-                          {chartData.paymentStatus.map((entry, index) => (
+                          {safeChartData.paymentStatus.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
                           ))}
                         </Pie>
@@ -460,19 +481,19 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Grade Distribution - NOT for Finance */}
-        {role !== 'finance' && (
+        {!isFinancePage && role !== 'finance' && (
           <Card className="bg-gradient-to-br from-white to-orange-50/50 border-orange-200/50 shadow-lg" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '4px' }}>
             <CardHeader>
               <CardTitle style={{ color: UCU_COLORS.navy }}>Grade Distribution</CardTitle>
               <CardDescription>Distribution of letter grades</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" data-chart-title="Grade Distribution">
-                {chartData.gradeDistribution.length > 0 ? (
+              <div className="h-[250px]" data-chart-title="Grade Distribution">
+                {safeChartData.gradeDistribution.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={chartData.gradeDistribution}
+                        data={safeChartData.gradeDistribution}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -481,7 +502,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                         dataKey="value"
                         label={({ name, value }) => `${name}: ${value}`}
                       >
-                        {chartData.gradeDistribution.map((entry, index) => (
+                        {safeChartData.gradeDistribution.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={GRADE_COLORS[index % GRADE_COLORS.length]} />
                         ))}
                       </Pie>
@@ -506,8 +527,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
           </Card>
         )}
 
-        {/* Top 10 Students - Role-specific scope */}
-        {['senate', 'dean', 'hod', 'staff'].includes(role) && (
+        {/* Top 10 Students - Role-specific scope (NOT for Finance) */}
+        {!isFinancePage && ['senate', 'dean', 'hod', 'staff'].includes(role) && (
           <Card className="bg-gradient-to-br from-white to-red-50/50 border-red-200/50 shadow-lg" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '4px' }}>
             <CardHeader>
               <CardTitle style={{ color: UCU_COLORS.navy }}>Top 10 Students</CardTitle>
@@ -519,10 +540,10 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" data-chart-title="Top 10 Students">
-                {chartData.topStudents.length > 0 ? (
+              <div className="h-[250px]" data-chart-title="Top 10 Students">
+                {safeChartData.topStudents.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.topStudents}>
+                    <BarChart data={safeChartData.topStudents}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis 
                         dataKey="name" 
@@ -561,18 +582,18 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
           </Card>
         )}
 
-        {/* Payment Trends - Finance only */}
-        {role === 'finance' && (
+        {/* Payment Trends - Finance and Senate (ALWAYS for Finance pages) */}
+        {(isFinancePage || role === 'finance' || role === 'senate') && (
           <Card className="bg-gradient-to-br from-white to-green-50/50 border-green-200/50 shadow-lg" style={{ borderLeftColor: '#10b981', borderLeftWidth: '4px' }}>
             <CardHeader>
               <CardTitle style={{ color: '#10b981' }}>Payment Trends Over Time</CardTitle>
               <CardDescription>Payment collection trends and revenue flow</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]" data-chart-title="Payment Trends Over Time">
-                {chartData.paymentTrends.length > 0 ? (
+              <div className="h-[250px]" data-chart-title="Payment Trends Over Time">
+                {safeChartData.paymentTrends.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData.paymentTrends}>
+                    <AreaChart data={safeChartData.paymentTrends}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis 
                         dataKey="period" 
@@ -618,7 +639,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       </div>
 
       {/* Attendance Trends - NOT for Finance */}
-      {role !== 'finance' && (
+      {!isFinancePage && role !== 'finance' && (
         <Card className="bg-gradient-to-br from-white to-yellow-50/50 border-yellow-200/50 shadow-lg" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '4px' }}>
           <CardHeader>
             <CardTitle style={{ color: UCU_COLORS.navy }}>Attendance Trends</CardTitle>
@@ -626,15 +647,15 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               {role === 'staff' && 'Attendance in your courses over time'}
               {role === 'hod' && 'Attendance in your department over time'}
               {role === 'dean' && 'Attendance in your faculty/school over time'}
-              {role === 'senate' && 'Institution-wide attendance trends'}
+              {role === 'senate' && 'Institution-wide attendance trends over quarters'}
               {role === 'student' && 'Your attendance over time'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]" data-chart-title="Attendance Trends">
-              {chartData.attendance.length > 0 ? (
+            <div className="h-[250px]" data-chart-title="Attendance Trends">
+              {safeChartData.attendance.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData.attendance}>
+                  <AreaChart data={safeChartData.attendance}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis 
                       dataKey="period" 

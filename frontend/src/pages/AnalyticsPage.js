@@ -11,12 +11,21 @@ import ExportButtons from '../components/ExportButtons';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
+import { loadPageState, savePageState } from '../utils/statePersistence';
 
 const AnalyticsPage = ({ type = 'general' }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
-  const [filters, setFilters] = useState({});
+  
+  // Load persisted state on mount
+  const savedState = loadPageState(`${type}_analytics`, { filters: {} });
+  const [filters, setFilters] = useState(savedState.filters || {});
+
+  // Save state whenever it changes
+  useEffect(() => {
+    savePageState(`${type}_analytics`, { filters });
+  }, [filters, type]);
 
   useEffect(() => {
     loadAnalytics();
@@ -70,7 +79,7 @@ const AnalyticsPage = ({ type = 'general' }) => {
         />
       </div>
 
-      <GlobalFilterPanel onFilterChange={setFilters} />
+      <GlobalFilterPanel onFilterChange={setFilters} pageName={`${type}_analytics`} />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

@@ -355,27 +355,45 @@ def get_grades_over_time():
         
         query = f"""
         SELECT 
-            CONCAT(dt.month_name, ' ', CAST(dt.year AS CHAR)) as period,
+            CONCAT('Q', CAST(QUARTER(dt.date_value) AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
+            dt.year,
+            QUARTER(dt.date_value) as quarter,
             AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade,
+            COUNT(CASE WHEN fg.exam_status = 'Completed' THEN 1 END) as completed_exams,
             COUNT(CASE WHEN fg.exam_status = 'MEX' THEN 1 END) as missed_exams,
-            COUNT(CASE WHEN fg.exam_status = 'FEX' THEN 1 END) as failed_exams
+            COUNT(CASE WHEN fg.exam_status = 'FEX' THEN 1 END) as failed_exams,
+            COUNT(DISTINCT fg.student_id) as total_students,
+            COUNT(DISTINCT fg.course_id) as total_courses
         FROM fact_grade fg
         JOIN dim_time dt ON fg.date_key = dt.date_key
         JOIN dim_student ds ON fg.student_id = ds.student_id
         {join_clause}
         {where_clause}
-        GROUP BY dt.year, dt.month, dt.month_name
-        ORDER BY dt.year, dt.month
+        GROUP BY dt.year, QUARTER(dt.date_value)
+        ORDER BY dt.year, QUARTER(dt.date_value)
         """
         
         df = pd.read_sql_query(text(query), engine)
         engine.dispose()
         
+        # Calculate pass rate and other metrics
+        if not df.empty:
+            df['total_exams'] = df['completed_exams'] + df['missed_exams'] + df['failed_exams']
+            df['pass_rate'] = (df['completed_exams'] / df['total_exams'] * 100).round(2)
+            df['pass_rate'] = df['pass_rate'].fillna(0)
+        else:
+            df['total_exams'] = []
+            df['pass_rate'] = []
+        
         return jsonify({
             'periods': df['period'].tolist(),
             'grades': df['avg_grade'].round(2).tolist(),
             'missed_exams': df['missed_exams'].tolist(),
-            'failed_exams': df['failed_exams'].tolist()
+            'failed_exams': df['failed_exams'].tolist(),
+            'completed_exams': df['completed_exams'].tolist(),
+            'total_students': df['total_students'].tolist(),
+            'total_courses': df['total_courses'].tolist(),
+            'pass_rate': df['pass_rate'].tolist()
         })
     except Exception as e:
         print(f"Error in get_grades_over_time: {e}")
@@ -682,15 +700,115 @@ def get_attendance_trends():
         
         query = f"""
         SELECT 
-            CONCAT(dt.month_name, ' ', CAST(dt.year AS CHAR)) as period,
+            CONCAT('Q', CAST(QUARTER(dt.date_value) AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
+            dt.year,
+            QUARTER(dt.date_value) as quarter,
             AVG(fa.total_hours) as avg_attendance,
-            AVG(fa.days_present) as avg_days_present
+            AVG(fa.days_present) as avg_days_present,
+            SUM(fa.total_hours) as total_hours,
+            SUM(fa.days_present) as total_days_present,
+            COUNT(DISTINCT fa.student_id) as total_students,
+            COUNT(DISTINCT fa.course_id) as total_courses
         FROM fact_attendance fa
         JOIN dim_time dt ON fa.date_key = dt.date_key
         {join_clause}
         {where_clause}
-        GROUP BY dt.year, dt.month, dt.month_name
-        ORDER BY dt.year, dt.month
+        GROUP BY dt.year, QUARTER(dt.date_value)
+        ORDER BY dt.year, QUARTER(dt.date_value)
+        """
+        
+        df = pd.read_sql_query(text(query), engine)
+        engine.dispose()
+        
+        # Calculate attendance rate
+        if not df.empty:
+            df['attendance_rate'] = (df['avg_days_present'] / 30 * 100).round(2)  # Assuming ~30 days per month
+            df['attendance_rate'] = df['attendance_rate'].fillna(0)
+        else:
+            df['attendance_rate'] = []
+        
+        return jsonify({
+            'periods': df['period'].tolist(),
+            'attendance': df['avg_attendance'].round(2).tolist(),
+            'days_present': df['avg_days_present'].round(2).tolist(),
+            'total_hours': df['total_hours'].round(2).tolist(),
+            'total_days_present': df['total_days_present'].round(2).tolist(),
+            'total_students': df['total_students'].tolist(),
+            'total_courses': df['total_courses'].tolist(),
+            'attendance_rate': df['attendance_rate'].tolist()
+        })
+    except Exception as e:
+        print(f"Error in get_attendance_trends: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dashboard/payment-trends', methods=['GET'])
+@jwt_required()
+def get_payment_trends():
+    """Get payment trends over time with role-based filtering - grouped by quarters for longer periods"""
+    try:
+        from flask_jwt_extended import get_jwt
+        from rbac import Role
+        
+        claims = get_jwt()
+        role_str = claims.get('role', 'finance')
+        try:
+            role = Role(role_str.lower())
+        except:
+            role = Role.FINANCE
+        
+        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        filters = request.args.to_dict()
+        
+        # Build WHERE clause based on role
+        where_clauses = []
+        
+        # Role-based scoping - Senate and Finance can see all, others are scoped
+        if role == Role.DEAN and claims.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {claims['faculty_id']}")
+        elif role == Role.HOD and claims.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {claims['department_id']}")
+        elif role == Role.STUDENT:
+            if claims.get('student_id'):
+                where_clauses.append(f"fp.student_id = '{claims['student_id']}'")
+            elif claims.get('access_number'):
+                where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
+        
+        # Apply user filters
+        if filters.get('faculty_id'):
+            where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
+        if filters.get('department_id'):
+            where_clauses.append(f"ddept.department_id = {filters['department_id']}")
+        if filters.get('program_id'):
+            where_clauses.append(f"ds.program_id = {filters['program_id']}")
+        if filters.get('semester_id'):
+            where_clauses.append(f"fp.semester_id = {filters['semester_id']}")
+        
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        # Join with student, program, department, faculty for role-based filtering
+        join_clause = ""
+        if role in [Role.DEAN, Role.HOD, Role.STUDENT] or filters.get('faculty_id') or filters.get('department_id'):
+            join_clause = """
+            JOIN dim_student ds ON fp.student_id = ds.student_id
+            LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+            LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+            LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+            """
+        
+        query = f"""
+        SELECT 
+            CONCAT('Q', CAST(QUARTER(dt.date_value) AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
+            SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) as total_amount,
+            COUNT(CASE WHEN fp.status = 'Completed' THEN 1 END) as completed_count,
+            COUNT(CASE WHEN fp.status = 'Pending' THEN 1 END) as pending_count
+        FROM fact_payment fp
+        JOIN dim_time dt ON fp.date_key = dt.date_key
+        {join_clause}
+        {where_clause}
+        GROUP BY dt.year, QUARTER(dt.date_value)
+        ORDER BY dt.year, QUARTER(dt.date_value)
         """
         
         df = pd.read_sql_query(text(query), engine)
@@ -698,11 +816,12 @@ def get_attendance_trends():
         
         return jsonify({
             'periods': df['period'].tolist(),
-            'attendance': df['avg_attendance'].round(2).tolist(),
-            'days_present': df['avg_days_present'].round(2).tolist()
+            'amounts': df['total_amount'].round(2).tolist(),
+            'completed_count': df['completed_count'].tolist(),
+            'pending_count': df['pending_count'].tolist()
         })
     except Exception as e:
-        print(f"Error in get_attendance_trends: {e}")
+        print(f"Error in get_payment_trends: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

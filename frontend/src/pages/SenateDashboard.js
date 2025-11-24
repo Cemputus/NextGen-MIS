@@ -12,11 +12,21 @@ import RoleBasedCharts from '../components/RoleBasedCharts';
 import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
+import { loadPageState, savePageState } from '../utils/statePersistence';
 
 const SenateDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
-  const [filters, setFilters] = useState({});
+  
+  // Load persisted state on mount
+  const savedState = loadPageState('senate_dashboard', { filters: {}, tab: 'overview' });
+  const [filters, setFilters] = useState(savedState.filters || {});
+  const [activeTab, setActiveTab] = useState(savedState.tab || 'overview');
+
+  // Save state whenever it changes
+  useEffect(() => {
+    savePageState('senate_dashboard', { filters, tab: activeTab });
+  }, [filters, activeTab]);
 
   useEffect(() => {
     loadDashboardData();
@@ -80,7 +90,7 @@ const SenateDashboard = () => {
       </div>
 
       {/* Filters */}
-      <GlobalFilterPanel onFilterChange={setFilters} />
+      <GlobalFilterPanel onFilterChange={setFilters} pageName="senate_dashboard" />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -95,7 +105,10 @@ const SenateDashboard = () => {
           <ModernStatsCards stats={stats} type="general" />
 
           {/* Main Analytics */}
-          <Tabs defaultValue="overview" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value);
+            savePageState('senate_dashboard', { filters, tab: value });
+          }} className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
@@ -145,10 +158,8 @@ const SenateDashboard = () => {
                   <CardTitle>Financial Overview</CardTitle>
                   <CardDescription>Revenue, budget, and financial performance</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-96 flex items-center justify-center text-muted-foreground">
-                    Financial analytics visualization
-                  </div>
+                <CardContent data-chart-container="true" data-chart-title="Financial Overview">
+                  <RoleBasedCharts filters={filters} type="finance" />
                 </CardContent>
               </Card>
             </TabsContent>

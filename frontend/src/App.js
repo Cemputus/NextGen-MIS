@@ -53,6 +53,7 @@ import HRStaff from './pages/HRStaff';
 
 // Finance Pages
 import FinancePayments from './pages/FinancePayments';
+import SenateFinance from './pages/SenateFinance';
 
 function PrivateRoute({ children, requiredRole = null }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -178,6 +179,7 @@ function App() {
                     <Route path="analytics" element={<AnalyticsPage type="senate" />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
+                    <Route path="finance" element={<SenateFinance />} />
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />

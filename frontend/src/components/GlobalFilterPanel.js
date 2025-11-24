@@ -11,9 +11,14 @@ import { Select } from './ui/select';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import axios from 'axios';
+import { loadFilters, saveFilters, loadSearchTerm, saveSearchTerm } from '../utils/statePersistence';
 
-const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
-  const [filters, setFilters] = useState({});
+const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'global' }) => {
+  // Load persisted filters and search term
+  const savedFiltersState = loadFilters(pageName, savedFilters || {});
+  const savedSearch = loadSearchTerm(pageName, '');
+  
+  const [filters, setFilters] = useState(savedFiltersState);
   const [filterOptions, setFilterOptions] = useState({
     faculties: [],
     departments: [],
@@ -23,7 +28,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
     high_schools: [],
     intake_years: [],
   });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(savedSearch);
   const [loading, setLoading] = useState(false);
 
   // Load filter options with current filter values for syncing
@@ -47,17 +52,22 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
     }
   };
 
-  // Load filter options on initial mount
+  // Load filter options on initial mount with saved filters
   useEffect(() => {
-    loadFilterOptions({});
-  }, []);
+    loadFilterOptions(filters);
+  }, []); // Only run on mount
 
   // Reload filter options when parent filters change
   useEffect(() => {
-    if (Object.keys(filters).length > 0) {
-      loadFilterOptions(filters);
-    }
+    loadFilterOptions(filters);
   }, [filters.faculty_id, filters.department_id, filters.program_id]);
+  
+  // Notify parent of initial filters on mount
+  useEffect(() => {
+    if (Object.keys(filters).length > 0) {
+      onFilterChange(filters);
+    }
+  }, []); // Only on mount
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters };
@@ -86,6 +96,9 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
     setFilters(newFilters);
     onFilterChange(newFilters);
     
+    // Save filters to localStorage
+    saveFilters(pageName, newFilters);
+    
     // Reload filter options after a short delay to allow state to update
     setTimeout(() => {
       loadFilterOptions(newFilters);
@@ -93,6 +106,9 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
   };
 
   const handleSearch = () => {
+    // Save search term
+    saveSearchTerm(pageName, searchTerm);
+    
     if (searchTerm.trim()) {
       const trimmed = searchTerm.trim();
       // Check for Access Number format (e.g., A12345, B67890)

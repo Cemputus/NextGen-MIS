@@ -64,6 +64,7 @@ const LayoutModern = ({ children }) => {
         { path: '/senate/analytics', label: 'Analytics', icon: BarChart3 },
         { path: '/senate/fex', label: 'FEX Analysis', icon: FileText },
         { path: '/senate/high-school', label: 'High School', icon: Building2 },
+        { path: '/senate/finance', label: 'Finance', icon: DollarSign },
         { path: '/senate/predictions', label: 'Predictions', icon: TrendingUp },
         { path: '/senate/reports', label: 'Reports', icon: FileText },
         { path: '/senate/profile', label: 'Profile', icon: User },

@@ -105,7 +105,11 @@ const FEXAnalytics = () => {
         <div className="flex gap-2 items-center">
           <Select
             value={drilldown}
-            onChange={(e) => setDrilldown(e.target.value)}
+            onChange={(e) => {
+              const newDrilldown = e.target.value;
+              setDrilldown(newDrilldown);
+              saveDrilldown('fex_analytics', newDrilldown);
+            }}
             className="w-48"
           >
             <option value="overall">Overall</option>
@@ -129,7 +133,7 @@ const FEXAnalytics = () => {
       </div>
 
       {/* Global Filter Panel */}
-      <GlobalFilterPanel onFilterChange={setFilters} />
+      <GlobalFilterPanel onFilterChange={setFilters} pageName="fex_analytics" />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -171,7 +175,10 @@ const FEXAnalytics = () => {
           </DashboardGrid>
 
           {/* Charts */}
-          <Tabs defaultValue="distribution" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value);
+            savePageState('fex_analytics', { filters, drilldown, tab: value });
+          }} className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="distribution" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
