@@ -11,7 +11,7 @@ import ExportButtons from '../components/ExportButtons';
 import { KPICard } from '../components/ui/kpi-card';
 import { DashboardGrid } from '../components/ui/dashboard-grid';
 import axios from 'axios';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { SciBarChart, SciLineChart, UCU_COLORS } from '../components/SciChartComponents';
 import { Loader2 } from 'lucide-react';
 import { loadPageState, savePageState } from '../utils/statePersistence';
 
@@ -155,42 +155,20 @@ const HighSchoolAnalytics = () => {
                   <CardDescription>Student enrollment distribution across high schools</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px]" data-chart-title="Enrollment by High School">
-                    {chartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData.slice(0, 20)}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis 
-                            dataKey="high_school" 
-                            angle={-45} 
-                            textAnchor="end" 
-                            height={100} 
-                            stroke="#64748b"
-                            fontSize={12}
-                          />
-                          <YAxis stroke="#64748b" />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                            }} 
-                          />
-                          <Legend />
-                          <Bar dataKey="total_students" fill="#3182CE" name="Total Students" radius={[8, 8, 0, 0]} />
-                          <Bar dataKey="enrolled_students" fill="#38A169" name="Enrolled" radius={[8, 8, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                        <div className="text-center">
-                          <School className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                          <p>No high school data available</p>
-                          <p className="text-sm mt-2">Try adjusting your filters</p>
-                        </div>
-                      </div>
-                    )}
+                  <div className="h-[400px]" data-chart-title="Enrollment by High School" data-chart-container="true">
+                    <SciBarChart
+                      data={chartData.slice(0, 20)}
+                      xDataKey="high_school"
+                      yDataKeys={[
+                        { key: 'total_students', label: 'Total Students', color: '#3182CE' },
+                        { key: 'enrolled_students', label: 'Enrolled', color: '#38A169' }
+                      ]}
+                      height={400}
+                      xAxisLabel="High School"
+                      yAxisLabel="Number of Students"
+                      showLegend={true}
+                      showGrid={true}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -203,42 +181,19 @@ const HighSchoolAnalytics = () => {
                   <CardDescription>Retention, graduation, and dropout rates by high school</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px]" data-chart-title="Retention & Graduation Rates">
-                    {chartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData.slice(0, 20)}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis 
-                            dataKey="high_school" 
-                            angle={-45} 
-                            textAnchor="end" 
-                            height={100} 
-                            stroke="#64748b"
-                            fontSize={12}
-                          />
-                          <YAxis stroke="#64748b" />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                            }} 
-                          />
-                          <Legend />
-                          <Line type="monotone" dataKey="retention_rate" stroke="#38A169" name="Retention Rate %" strokeWidth={2} />
-                          <Line type="monotone" dataKey="graduation_rate" stroke="#3182CE" name="Graduation Rate %" strokeWidth={2} />
-                          <Line type="monotone" dataKey="dropout_rate" stroke="#E53E3E" name="Dropout Rate %" strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                        <div className="text-center">
-                          <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                          <p>No retention data available</p>
-                        </div>
-                      </div>
-                    )}
+                  <div className="h-[400px]" data-chart-title="Retention & Graduation Rates" data-chart-container="true">
+                    <SciLineChart
+                      data={chartData.slice(0, 20)}
+                      xDataKey="high_school"
+                      yDataKey="retention_rate"
+                      height={400}
+                      xAxisLabel="High School"
+                      yAxisLabel="Rate (%)"
+                      strokeColor="#38A169"
+                      strokeWidth={3}
+                      showLegend={true}
+                      showGrid={true}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -287,12 +242,21 @@ const HighSchoolAnalytics = () => {
                   <CardDescription>Tuition completion rates by high school</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                    <div className="text-center">
-                      <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>Tuition completion analysis</p>
-                      <p className="text-sm mt-2">Coming soon</p>
-                    </div>
+                  <div className="h-[400px]" data-chart-title="Performance Analysis" data-chart-container="true">
+                    <SciBarChart
+                      data={chartData.slice(0, 20)}
+                      xDataKey="high_school"
+                      yDataKeys={[
+                        { key: 'avg_grade', label: 'Average Grade', color: '#8b5cf6' },
+                        { key: 'total_fex', label: 'FEX Count', color: '#ef4444' },
+                        { key: 'total_mex', label: 'MEX Count', color: '#f59e0b' }
+                      ]}
+                      height={400}
+                      xAxisLabel="High School"
+                      yAxisLabel="Count / Grade"
+                      showLegend={true}
+                      showGrid={true}
+                    />
                   </div>
                 </CardContent>
               </Card>

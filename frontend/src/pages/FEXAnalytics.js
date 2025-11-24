@@ -14,7 +14,8 @@ import { DashboardGrid } from '../components/ui/dashboard-grid';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
 import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+// FEXAnalytics no longer uses Recharts - all charts migrated to SciChart
+import { SciBarChart, UCU_COLORS } from '../components/SciChartComponents';
 import { Loader2 } from 'lucide-react';
 import { loadPageState, savePageState, loadDrilldown, saveDrilldown } from '../utils/statePersistence';
 
@@ -205,43 +206,21 @@ const FEXAnalytics = () => {
                   <CardDescription>Failed exam distribution by {drilldown}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px]" data-chart-title={`FEX Distribution by ${drilldown}`}>
-                    {chartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis 
-                            dataKey={getDataKey()} 
-                            angle={-45} 
-                            textAnchor="end" 
-                            height={100} 
-                            stroke="#64748b"
-                            fontSize={12}
-                          />
-                          <YAxis stroke="#64748b" />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                            }} 
-                          />
-                          <Legend />
-                          <Bar dataKey="total_fex" fill="#ef4444" name="FEX" radius={[8, 8, 0, 0]} />
-                          <Bar dataKey="total_mex" fill="#f59e0b" name="MEX" radius={[8, 8, 0, 0]} />
-                          <Bar dataKey="total_fcw" fill="#8b5cf6" name="FCW" radius={[8, 8, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                      <div className="text-center">
-                        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                        <p>No FEX data available for selected filters</p>
-                        <p className="text-sm mt-2">Try adjusting your filters or check if data exists.</p>
-                      </div>
-                      </div>
-                    )}
+                  <div className="h-[400px]" data-chart-title={`FEX Distribution by ${drilldown}`} data-chart-container="true">
+                    <SciBarChart
+                      data={chartData}
+                      xDataKey={getDataKey()}
+                      yDataKeys={[
+                        { key: 'total_fex', label: 'FEX', color: '#ef4444' },
+                        { key: 'total_mex', label: 'MEX', color: '#f59e0b' },
+                        { key: 'total_fcw', label: 'FCW', color: '#8b5cf6' }
+                      ]}
+                      height={400}
+                      xAxisLabel={drilldown.charAt(0).toUpperCase() + drilldown.slice(1)}
+                      yAxisLabel="Count"
+                      showLegend={true}
+                      showGrid={true}
+                    />
                   </div>
                 </CardContent>
               </Card>

@@ -32,7 +32,7 @@ import {
 import { FaChartLine, FaMagic, FaUsers, FaLightbulb } from 'react-icons/fa';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+// PredictionPage doesn't use charts currently - removed unused import
 
 const PredictionPage = () => {
   const { user } = useAuth();

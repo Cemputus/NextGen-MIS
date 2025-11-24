@@ -3,13 +3,10 @@
  * Displays various analytics charts with filter-based data
  */
 import React, { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
-} from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
+import { SciLineChart, SciBarChart, SciAreaChart, SciStackedColumnChart, UCU_COLORS } from './SciChartComponents';
 
 // Color themes
 const DEPT_COLORS = ['#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
@@ -118,36 +115,18 @@ const Charts = ({ data, filters = {}, type = 'general' }) => {
             <CardDescription>Student distribution across departments {Object.keys(filters).length > 0 && '(Filtered)'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {chartData.departments.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData.departments}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="name" 
-                      angle={-45} 
-                      textAnchor="end" 
-                      height={80} 
-                      stroke="#64748b"
-                      fontSize={12}
-                    />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }} 
-                    />
-                    <Bar dataKey="students" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No data available for selected filters
-                </div>
-              )}
+            <div className="h-[300px]" data-chart-container="true">
+              <SciBarChart
+                data={chartData.departments}
+                xDataKey="name"
+                yDataKey="students"
+                height={300}
+                xAxisLabel="Department"
+                yAxisLabel="Number of Students"
+                fillColor="#3b82f6"
+                showLegend={true}
+                showGrid={true}
+              />
             </div>
           </CardContent>
         </Card>
@@ -159,44 +138,19 @@ const Charts = ({ data, filters = {}, type = 'general' }) => {
             <CardDescription>Grade trends across periods {Object.keys(filters).length > 0 && '(Filtered)'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {chartData.gradesOverTime.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData.gradesOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="period" 
-                      angle={-45} 
-                      textAnchor="end" 
-                      height={80} 
-                      stroke="#64748b"
-                      fontSize={12}
-                    />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }} 
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="grade" 
-                      stroke="#8b5cf6" 
-                      strokeWidth={3}
-                      dot={{ fill: '#8b5cf6', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No data available for selected filters
-                </div>
-              )}
+            <div className="h-[300px]" data-chart-container="true">
+              <SciLineChart
+                data={chartData.gradesOverTime}
+                xDataKey="period"
+                yDataKey="grade"
+                height={300}
+                xAxisLabel="Time Period"
+                yAxisLabel="Average Grade (%)"
+                strokeColor="#8b5cf6"
+                strokeWidth={3}
+                showLegend={true}
+                showGrid={true}
+              />
             </div>
           </CardContent>
         </Card>
@@ -210,39 +164,19 @@ const Charts = ({ data, filters = {}, type = 'general' }) => {
             <CardDescription>Payment status breakdown {Object.keys(filters).length > 0 && '(Filtered)'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {chartData.paymentStatus.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData.paymentStatus}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {chartData.paymentStatus.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }} 
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No data available for selected filters
-                </div>
-              )}
+            <div className="h-[300px]" data-chart-container="true">
+              <SciStackedColumnChart
+                data={chartData.paymentStatus}
+                xDataKey="name"
+                yDataKey="value"
+                height={300}
+                xAxisLabel="Payment Status"
+                yAxisLabel="Number of Students"
+                colors={PAYMENT_COLORS}
+                showLegend={true}
+                showGrid={true}
+                showPercentages={true}
+              />
             </div>
           </CardContent>
         </Card>
@@ -254,39 +188,19 @@ const Charts = ({ data, filters = {}, type = 'general' }) => {
             <CardDescription>Distribution of letter grades {Object.keys(filters).length > 0 && '(Filtered)'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {chartData.gradeDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData.gradeDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {chartData.gradeDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={GRADE_COLORS[index % GRADE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }} 
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No data available for selected filters
-                </div>
-              )}
+            <div className="h-[300px]" data-chart-container="true">
+              <SciStackedColumnChart
+                data={chartData.gradeDistribution}
+                xDataKey="name"
+                yDataKey="value"
+                height={300}
+                xAxisLabel="Grade"
+                yAxisLabel="Number of Students"
+                colors={GRADE_COLORS}
+                showLegend={true}
+                showGrid={true}
+                showPercentages={true}
+              />
             </div>
           </CardContent>
         </Card>
@@ -300,36 +214,18 @@ const Charts = ({ data, filters = {}, type = 'general' }) => {
             <CardDescription>Highest performing students {Object.keys(filters).length > 0 && '(Filtered)'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {chartData.topStudents.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData.topStudents}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="name" 
-                      angle={-45} 
-                      textAnchor="end" 
-                      height={100} 
-                      stroke="#64748b"
-                      fontSize={12}
-                    />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }} 
-                    />
-                    <Bar dataKey="grade" fill="#ef4444" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No data available for selected filters
-                </div>
-              )}
+            <div className="h-[300px]" data-chart-container="true">
+              <SciBarChart
+                data={chartData.topStudents}
+                xDataKey="name"
+                yDataKey="grade"
+                height={300}
+                xAxisLabel="Student Name"
+                yAxisLabel="Average Grade (%)"
+                fillColor="#ef4444"
+                showLegend={true}
+                showGrid={true}
+              />
             </div>
           </CardContent>
         </Card>
@@ -341,42 +237,20 @@ const Charts = ({ data, filters = {}, type = 'general' }) => {
             <CardDescription>Attendance over time {Object.keys(filters).length > 0 && '(Filtered)'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {chartData.attendance.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData.attendance}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="period" 
-                      angle={-45} 
-                      textAnchor="end" 
-                      height={80} 
-                      stroke="#64748b"
-                      fontSize={12}
-                    />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }} 
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="attendance" 
-                      stroke="#f59e0b" 
-                      fill="#fbbf24"
-                      fillOpacity={0.6}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No data available for selected filters
-                </div>
-              )}
+            <div className="h-[300px]" data-chart-container="true">
+              <SciAreaChart
+                data={chartData.attendance}
+                xDataKey="period"
+                yDataKey="attendance"
+                height={300}
+                xAxisLabel="Time Period"
+                yAxisLabel="Average Attendance (Hours)"
+                fillColor="#fbbf24"
+                strokeColor="#f59e0b"
+                strokeWidth={3}
+                showLegend={true}
+                showGrid={true}
+              />
             </div>
           </CardContent>
         </Card>
