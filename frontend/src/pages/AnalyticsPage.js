@@ -58,7 +58,16 @@ const AnalyticsPage = ({ type = 'general' }) => {
           <h1 className="text-2xl font-bold text-gray-900">{getTitle()}</h1>
           <p className="text-muted-foreground">Comprehensive analytics and insights</p>
         </div>
-        <ExportButtons stats={stats} filters={filters} filename={`${type}_analytics`} />
+        <ExportButtons 
+          stats={stats} 
+          filters={filters} 
+          filename={`${type}_analytics`}
+          chartSelectors={[
+            '.recharts-wrapper', // All recharts components
+            '[class*="chart"]',
+            '[data-chart]'
+          ]}
+        />
       </div>
 
       <GlobalFilterPanel onFilterChange={setFilters} />
@@ -75,7 +84,7 @@ const AnalyticsPage = ({ type = 'general' }) => {
               <CardTitle>Analytics Overview</CardTitle>
               <CardDescription>Detailed analytics and visualizations</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent data-chart-container="true">
               <RoleBasedCharts filters={filters} type={type} />
             </CardContent>
           </Card>

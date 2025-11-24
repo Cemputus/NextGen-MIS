@@ -16,12 +16,22 @@ import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Loader2 } from 'lucide-react';
+import { loadPageState, savePageState, loadDrilldown, saveDrilldown } from '../utils/statePersistence';
 
 const FEXAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [fexData, setFexData] = useState(null);
-  const [drilldown, setDrilldown] = useState('overall');
-  const [filters, setFilters] = useState({});
+  
+  // Load persisted state on mount
+  const savedState = loadPageState('fex_analytics', { filters: {}, drilldown: 'overall', tab: 'distribution' });
+  const [drilldown, setDrilldown] = useState(savedState.drilldown || 'overall');
+  const [filters, setFilters] = useState(savedState.filters || {});
+  const [activeTab, setActiveTab] = useState(savedState.tab || 'distribution');
+
+  // Save state whenever it changes
+  useEffect(() => {
+    savePageState('fex_analytics', { filters, drilldown, tab: activeTab });
+  }, [filters, drilldown, activeTab]);
 
   useEffect(() => {
     loadFEXData();
@@ -104,7 +114,17 @@ const FEXAnalytics = () => {
             <option value="program">By Program</option>
             <option value="course">By Course</option>
           </Select>
-          <ExportButtons data={fexData?.data} filters={{ ...filters, drilldown }} filename="fex_analytics" />
+          <ExportButtons 
+            data={fexData?.data} 
+            filters={{ ...filters, drilldown }} 
+            filename="fex_analytics"
+            stats={summary}
+            chartSelectors={[
+              '.recharts-wrapper', // All recharts components
+              '[class*="chart"]',
+              '[data-chart]'
+            ]}
+          />
         </div>
       </div>
 
@@ -178,7 +198,7 @@ const FEXAnalytics = () => {
                   <CardDescription>Failed exam distribution by {drilldown}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px]">
+                  <div className="h-[400px]" data-chart-title={`FEX Distribution by ${drilldown}`}>
                     {chartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData}>

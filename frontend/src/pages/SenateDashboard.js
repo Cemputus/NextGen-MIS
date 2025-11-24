@@ -64,7 +64,19 @@ const SenateDashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900">Senate Dashboard</h1>
           <p className="text-muted-foreground">Institution-wide analytics and comprehensive reporting</p>
         </div>
-        <ExportButtons stats={stats} filters={filters} filename="senate_dashboard" />
+        <ExportButtons 
+          stats={stats} 
+          filters={filters} 
+          filename="senate_dashboard"
+          chartSelectors={[
+            '.recharts-wrapper', // All recharts components
+            '[class*="chart"]',
+            '[data-chart]',
+            '[data-chart-container]',
+            '.h-\\[350px\\]', // Chart containers with specific heights
+            '.h-\\[300px\\]'
+          ]}
+        />
       </div>
 
       {/* Filters */}
@@ -109,7 +121,7 @@ const SenateDashboard = () => {
                   <CardTitle>Institution Overview</CardTitle>
                   <CardDescription>Comprehensive analytics across all faculties</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent data-chart-container="true" data-chart-title="Institution Overview">
                   <RoleBasedCharts filters={filters} type="institution" />
                 </CardContent>
               </Card>
@@ -121,7 +133,7 @@ const SenateDashboard = () => {
                   <CardTitle>Academic Performance</CardTitle>
                   <CardDescription>Institution-wide academic metrics and trends</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent data-chart-container="true" data-chart-title="Academic Performance">
                   <RoleBasedCharts filters={filters} type="institution" />
                 </CardContent>
               </Card>

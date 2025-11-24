@@ -243,7 +243,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[350px]">
+            <div className="h-[350px]" data-chart-title="Student Distribution by Department">
               {chartData.studentDistribution.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData.studentDistribution}>
@@ -299,7 +299,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[300px]" data-chart-title="Average Grades Over Time">
                 {chartData.gradesOverTime.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData.gradesOverTime}>
@@ -366,7 +366,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[300px]" data-chart-title={role === 'student' ? 'My Payment Status' : 'Payment Status Distribution'}>
                 {chartData.paymentStatus.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     {role === 'student' && chartData.studentPaymentBreakdown ? (
@@ -467,7 +467,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               <CardDescription>Distribution of letter grades</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[300px]" data-chart-title="Grade Distribution">
                 {chartData.gradeDistribution.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -519,7 +519,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[300px]" data-chart-title="Top 10 Students">
                 {chartData.topStudents.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData.topStudents}>
@@ -569,7 +569,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
               <CardDescription>Payment collection trends and revenue flow</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[300px]" data-chart-title="Payment Trends Over Time">
                 {chartData.paymentTrends.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData.paymentTrends}>
@@ -631,7 +631,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[300px]" data-chart-title="Attendance Trends">
               {chartData.attendance.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData.attendance}>
