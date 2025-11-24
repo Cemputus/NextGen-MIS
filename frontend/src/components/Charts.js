@@ -8,12 +8,12 @@ import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 import { SciLineChart, SciBarChart, SciAreaChart, SciStackedColumnChart, UCU_COLORS } from './SciChartComponents';
 
-// Color themes
-const DEPT_COLORS = ['#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
-const PAYMENT_COLORS = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
-const GRADE_COLORS = ['#8b5cf6', '#a78bfa', '#c4b5fd', '#e9d5ff'];
-const ATTENDANCE_COLORS = ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a'];
-const STUDENT_COLORS = ['#ef4444', '#f87171', '#fca5a5', '#fecaca'];
+// Modern, visually appealing color themes
+const DEPT_COLORS = ['#4F46E5', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE']; // Vibrant indigo to light purple gradient
+const PAYMENT_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0']; // Fresh green gradient
+const GRADE_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE']; // Rich purple gradient
+const ATTENDANCE_COLORS = ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A']; // Warm amber gradient
+const STUDENT_COLORS = ['#06B6D4', '#22D3EE', '#67E8F9', '#A5F3FC']; // Cool cyan gradient
 
 const Charts = ({ data, filters = {}, type = 'general' }) => {
   const [chartData, setChartData] = useState({

@@ -17,11 +17,30 @@ import { SciLineChart, SciBarChart, SciAreaChart, SciStackedColumnChart, UCU_COL
 
 // UCU_COLORS is now imported from SciChartComponents
 
-// Enhanced Chart color palettes with UCU branding
-const DEPT_COLORS = [UCU_COLORS.blue, UCU_COLORS['blue-light'], '#0059b3', '#0073e6'];
-const PAYMENT_COLORS = ['#10b981', '#34d399', UCU_COLORS.maroon, '#f59e0b', '#ef4444'];
-const GRADE_COLORS = [UCU_COLORS.maroon, UCU_COLORS['gold-light'], '#FFD700', UCU_COLORS['gold-dark'], '#f59e0b'];
-const ATTENDANCE_COLORS = [UCU_COLORS.blue, UCU_COLORS['blue-light'], '#0059b3'];
+// Modern, visually appealing chart color palettes
+const DEPT_COLORS = ['#4F46E5', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE']; // Vibrant indigo to light purple gradient
+const PAYMENT_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0']; // Fresh green gradient
+const GRADE_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE']; // Rich purple gradient
+const ATTENDANCE_COLORS = ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A']; // Warm amber gradient
+const TREND_COLORS = ['#06B6D4', '#22D3EE', '#67E8F9', '#A5F3FC']; // Cool cyan gradient
+
+// Dynamic payment colors - red for failed, green for completed, etc.
+const getPaymentColors = (paymentData) => {
+  if (!paymentData || !Array.isArray(paymentData)) return PAYMENT_COLORS;
+  return paymentData.map(item => {
+    const status = (item.name || '').toLowerCase();
+    if (status.includes('failed') || status.includes('overdue') || status === 'failed') {
+      return '#EF4444'; // Vibrant red for failed
+    } else if (status.includes('completed') || status === 'paid') {
+      return '#10B981'; // Fresh green for completed
+    } else if (status.includes('pending')) {
+      return '#F59E0B'; // Warm amber for pending
+    } else if (status.includes('partial')) {
+      return '#34D399'; // Light green for partial
+    }
+    return '#6366F1'; // Default vibrant indigo
+  });
+};
 
 const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
   const { user } = useAuth();
@@ -272,7 +291,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                 height={450}
                 xAxisLabel="Department"
                 yAxisLabel="Number of Students"
-                fillColor={UCU_COLORS.blue}
+                fillColor="#4F46E5"
                 showLegend={true}
                 showGrid={true}
               />
@@ -304,7 +323,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                   height={450}
                   xAxisLabel="Time Period (Quarter)"
                   yAxisLabel="Average Grade (%)"
-                  strokeColor={UCU_COLORS.maroon}
+                  strokeColor="#8B5CF6"
                   strokeWidth={4}
                   showLegend={true}
                   showGrid={true}
@@ -365,7 +384,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                         height={200}
                         xAxisLabel="Payment Status"
                         yAxisLabel="Amount (UGX)"
-                        colors={[UCU_COLORS.blue, '#f59e0b']}
+                        colors={['#10B981', '#F59E0B']}
                         showLegend={true}
                         showGrid={true}
                         showPercentages={true}
@@ -379,7 +398,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                       height={450}
                       xAxisLabel="Payment Status"
                       yAxisLabel="Number of Students"
-                      colors={PAYMENT_COLORS}
+                      colors={getPaymentColors(safeChartData.paymentStatus)}
                       showLegend={true}
                       showGrid={true}
                       showPercentages={true}
@@ -447,7 +466,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                   height={450}
                   xAxisLabel="Student Name"
                   yAxisLabel="Average Grade (%)"
-                  fillColor={UCU_COLORS.maroon}
+                  fillColor="#8B5CF6"
                   showLegend={true}
                   showGrid={true}
                 />
@@ -472,8 +491,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                   height={450}
                   xAxisLabel="Time Period (Quarter)"
                   yAxisLabel="Amount (UGX)"
-                  fillColor="#10b981"
-                  strokeColor="#10b981"
+                  fillColor="#10B981"
+                  strokeColor="#10B981"
                   strokeWidth={3}
                   showLegend={true}
                   showGrid={true}
@@ -506,8 +525,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                 height={450}
                 xAxisLabel="Time Period (Quarter)"
                 yAxisLabel="Average Attendance (Hours)"
-                fillColor={UCU_COLORS.maroon}
-                strokeColor={UCU_COLORS.maroon}
+                fillColor="#8B5CF6"
+                strokeColor="#8B5CF6"
                 strokeWidth={3}
                 showLegend={true}
                 showGrid={true}

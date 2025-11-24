@@ -40,10 +40,29 @@ const HighSchoolAnalytics = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         params: filters
       });
+      
+      // Log response for debugging
+      console.log('High School Analytics Response:', response.data);
+      
+      if (response.data.error) {
+        console.error('API returned error:', response.data.error);
+        console.error('Debug info:', response.data.debug_info);
+      }
+      
       setHsData(response.data);
     } catch (err) {
       console.error('Error loading high school data:', err);
-      setHsData({ data: [], summary: { total_high_schools: 0, total_students: 0, avg_retention_rate: 0, avg_graduation_rate: 0 } });
+      console.error('Error details:', err.response?.data || err.message);
+      setHsData({ 
+        data: [], 
+        summary: { 
+          total_high_schools: 0, 
+          total_students: 0, 
+          avg_retention_rate: 0, 
+          avg_graduation_rate: 0 
+        },
+        error: err.response?.data?.error || err.message
+      });
     } finally {
       setLoading(false);
     }
@@ -156,19 +175,35 @@ const HighSchoolAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px]" data-chart-title="Enrollment by High School" data-chart-container="true">
-                    <SciBarChart
-                      data={chartData.slice(0, 20)}
-                      xDataKey="high_school"
-                      yDataKeys={[
-                        { key: 'total_students', label: 'Total Students', color: '#3182CE' },
-                        { key: 'enrolled_students', label: 'Enrolled', color: '#38A169' }
-                      ]}
-                      height={400}
-                      xAxisLabel="High School"
-                      yAxisLabel="Number of Students"
-                      showLegend={true}
-                      showGrid={true}
-                    />
+                    {chartData.length > 0 ? (
+                      <SciBarChart
+                        data={chartData.slice(0, 20)}
+                        xDataKey="high_school"
+                        yDataKeys={[
+                          { key: 'total_students', label: 'Total Students', color: '#3182CE' },
+                          { key: 'enrolled_students', label: 'Enrolled', color: '#38A169' }
+                        ]}
+                        height={400}
+                        xAxisLabel="High School"
+                        yAxisLabel="Number of Students"
+                        showLegend={true}
+                        showGrid={true}
+                      />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                        <div className="text-center">
+                          <p className="text-lg font-medium">No data available</p>
+                          <p className="text-sm mt-2">
+                            {hsData?.error ? `Error: ${hsData.error}` : 'Try adjusting your filters or check if data exists.'}
+                          </p>
+                          {hsData?.debug_info && (
+                            <p className="text-xs mt-2 text-gray-500">
+                              High schools in DB: {hsData.debug_info.total_high_schools_in_db || 0}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -189,7 +224,7 @@ const HighSchoolAnalytics = () => {
                       height={400}
                       xAxisLabel="High School"
                       yAxisLabel="Rate (%)"
-                      strokeColor="#38A169"
+                      strokeColor="#10B981"
                       strokeWidth={3}
                       showLegend={true}
                       showGrid={true}

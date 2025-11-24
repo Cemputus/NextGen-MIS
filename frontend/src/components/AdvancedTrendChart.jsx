@@ -33,22 +33,27 @@ import {
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
 
-// UCU Branding Colors
+// UCU Branding Colors - Updated with modern, vibrant palette
 const UCU_COLORS = {
-  blue: '#003366',
-  'blue-light': '#004080',
-  'blue-dark': '#002244',
-  gold: '#FFD700',
-  'gold-light': '#FFE44D',
-  'gold-dark': '#CCAA00',
-  navy: '#1a237e',
+  blue: '#4F46E5', // Vibrant indigo
+  'blue-light': '#6366F1',
+  'blue-dark': '#312E81',
+  maroon: '#8B5CF6', // Rich purple
+  'maroon-light': '#A78BFA',
+  'maroon-dark': '#6D28D9',
+  gold: '#F59E0B', // Warm amber
+  'gold-light': '#FBBF24',
+  'gold-dark': '#D97706',
+  navy: '#1E40AF',
+  green: '#10B981',
+  cyan: '#06B6D4',
 };
 
 const AdvancedTrendChart = ({
   data = [],
   title = 'Trend Analysis',
   xDataKey = 'period',
-  yDataKeys = [{ key: 'value', label: 'Value', color: UCU_COLORS.blue }],
+  yDataKeys = [{ key: 'value', label: 'Value', color: UCU_COLORS.cyan }],
   chartType = 'line', // 'line', 'area', 'composed'
   height = 400,
   showLegend = true,

@@ -286,7 +286,7 @@ def get_high_school_analytics():
         query = """
         SELECT 
             ds.high_school,
-            ds.high_school_district,
+            COALESCE(ds.high_school_district, 'Unknown') as high_school_district,
             COUNT(DISTINCT ds.student_id) as total_students,
             COUNT(DISTINCT CASE WHEN ds.status = 'Active' THEN ds.student_id END) as active_students,
             COUNT(DISTINCT CASE WHEN ds.status = 'Graduated' THEN ds.student_id END) as graduated_students,
@@ -306,13 +306,13 @@ def get_high_school_analytics():
             COUNT(CASE WHEN fg.exam_status = 'MEX' THEN 1 END) as total_mex,
             COUNT(CASE WHEN fg.exam_status = 'FCW' THEN 1 END) as total_fcw,
             -- Tuition completion metrics
-            SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) as total_paid,
-            SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END) as total_pending,
-            SUM(fp.amount) as total_required,
+            COALESCE(SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END), 0) as total_paid,
+            COALESCE(SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END), 0) as total_pending,
+            COALESCE(SUM(fp.amount), 0) as total_required,
             COUNT(DISTINCT CASE WHEN fp.status = 'Pending' AND fp.amount > 500000 THEN fp.student_id END) as students_with_significant_balance,
             CASE 
-                WHEN SUM(fp.amount) > 0 
-                THEN SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) / SUM(fp.amount) * 100
+                WHEN COALESCE(SUM(fp.amount), 0) > 0 
+                THEN COALESCE(SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END), 0) / COALESCE(SUM(fp.amount), 1) * 100
                 ELSE 0 
             END as tuition_completion_rate,
             -- Attendance metrics
@@ -327,13 +327,103 @@ def get_high_school_analytics():
         LEFT JOIN fact_payment fp ON ds.student_id = fp.student_id
         LEFT JOIN fact_attendance fa ON ds.student_id = fa.student_id
         LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
+        LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
+        LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
+        WHERE ds.high_school IS NOT NULL AND ds.high_school != '' AND ds.high_school != 'NULL'
         """
         
-        query, params = build_filter_query(filters, query, user_scope)
+        # Build filter query - need to handle WHERE clause properly since we already have one
+        where_clauses = []
+        params = {}
+        
+        # Role-based scoping
+        if user_scope['role'] == Role.STUDENT:
+            if user_scope['student_id']:
+                where_clauses.append("ds.student_id = :student_id")
+                params['student_id'] = user_scope['student_id']
+            elif user_scope['access_number']:
+                where_clauses.append("ds.access_number = :access_number")
+                params['access_number'] = user_scope['access_number']
+        elif user_scope['role'] == Role.HOD:
+            if user_scope['department_id']:
+                where_clauses.append("ddept.department_id = :department_id")
+                params['department_id'] = user_scope['department_id']
+        elif user_scope['role'] == Role.DEAN:
+            if user_scope['faculty_id']:
+                where_clauses.append("df.faculty_id = :faculty_id")
+                params['faculty_id'] = user_scope['faculty_id']
+        
+        # Apply filters (skip empty strings and "all" values)
+        if filters:
+            if filters.get('faculty_id') and filters.get('faculty_id') not in ['', 'all', 'All Faculties']:
+                where_clauses.append("df.faculty_id = :filter_faculty_id")
+                params['filter_faculty_id'] = filters['faculty_id']
+            if filters.get('department_id') and filters.get('department_id') not in ['', 'all', 'All Departments']:
+                where_clauses.append("ddept.department_id = :filter_department_id")
+                params['filter_department_id'] = filters['department_id']
+            if filters.get('program_id') and filters.get('program_id') not in ['', 'all', 'All Programs']:
+                where_clauses.append("dp.program_id = :filter_program_id")
+                params['filter_program_id'] = filters['program_id']
+            if filters.get('high_school') and filters.get('high_school') not in ['', 'all', 'All High Schools']:
+                where_clauses.append("ds.high_school LIKE :filter_high_school")
+                params['filter_high_school'] = f"%{filters['high_school']}%"
+            if filters.get('intake_year') and filters.get('intake_year') not in ['', 'all', 'All Years']:
+                where_clauses.append("YEAR(ds.admission_date) = :filter_intake_year")
+                params['filter_intake_year'] = filters['intake_year']
+            if filters.get('semester_id') and filters.get('semester_id') not in ['', 'all', 'All Semesters']:
+                where_clauses.append("fg.semester_id = :filter_semester_id")
+                params['filter_semester_id'] = filters['semester_id']
+        
+        if where_clauses:
+            query += " AND " + " AND ".join(where_clauses)
+        
         query += " GROUP BY ds.high_school, ds.high_school_district"
+        query += " HAVING COUNT(DISTINCT ds.student_id) > 0"
         query += " ORDER BY total_students DESC"
         
-        df = pd.read_sql_query(text(query), engine, params=params)
+        # First, check if we have any high school data at all
+        check_query = "SELECT COUNT(DISTINCT high_school) as count FROM dim_student WHERE high_school IS NOT NULL AND high_school != ''"
+        try:
+            check_df = pd.read_sql_query(text(check_query), engine)
+            total_high_schools_check = check_df['count'].iloc[0] if not check_df.empty else 0
+            print(f"DEBUG: Found {total_high_schools_check} distinct high schools in database")
+        except Exception as check_error:
+            print(f"DEBUG: Error checking high school count: {check_error}")
+            total_high_schools_check = 0
+        
+        try:
+            print(f"DEBUG: Executing high school analytics query with {len(where_clauses)} additional filters")
+            df = pd.read_sql_query(text(query), engine, params=params)
+            print(f"DEBUG: Query returned {len(df)} rows")
+        except Exception as query_error:
+            print(f"High school analytics query error: {query_error}")
+            print(f"Query: {query}")
+            print(f"Params: {params}")
+            engine.dispose()
+            return jsonify({
+                'data': [],
+                'summary': {
+                    'total_high_schools': 0,
+                    'total_students': 0,
+                    'avg_retention_rate': 0,
+                    'avg_graduation_rate': 0,
+                    'avg_tuition_completion_rate': 0,
+                    'avg_performance': 0,
+                    'correlation_analysis': {
+                        'high_perf_high_tuition': 0,
+                        'high_perf_low_tuition': 0,
+                        'low_perf_high_tuition': 0,
+                        'low_perf_low_tuition': 0
+                    }
+                },
+                'error': str(query_error),
+                'debug_info': {
+                    'total_high_schools_in_db': int(total_high_schools_check),
+                    'query': query[:500] if len(query) > 500 else query,
+                    'params': params
+                }
+            }), 200
+        
         engine.dispose()
         
         # Calculate rates and relationships

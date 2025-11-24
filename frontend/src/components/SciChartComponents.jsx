@@ -43,18 +43,25 @@ import {
   Cell,
 } from 'recharts';
 
-// UCU Branding Colors
+// UCU Branding Colors - Updated with modern, vibrant palette
 const UCU_COLORS = {
-  blue: '#003366',
-  'blue-light': '#004080',
-  'blue-dark': '#002244',
-  maroon: '#800000',
-  'maroon-light': '#A00000',
-  'maroon-dark': '#600000',
-  gold: '#FFD700', // Keep for backward compatibility
-  'gold-light': '#FFE44D',
-  'gold-dark': '#CCAA00',
-  navy: '#1a237e',
+  blue: '#4F46E5', // Vibrant indigo
+  'blue-light': '#6366F1',
+  'blue-dark': '#312E81',
+  maroon: '#8B5CF6', // Rich purple (replacing maroon)
+  'maroon-light': '#A78BFA',
+  'maroon-dark': '#6D28D9',
+  gold: '#F59E0B', // Warm amber (replacing gold)
+  'gold-light': '#FBBF24',
+  'gold-dark': '#D97706',
+  navy: '#1E40AF',
+  // Additional modern colors
+  green: '#10B981',
+  'green-light': '#34D399',
+  red: '#EF4444',
+  orange: '#F59E0B',
+  purple: '#8B5CF6',
+  cyan: '#06B6D4',
 };
 
 /**
@@ -67,7 +74,7 @@ export const SciLineChart = ({
   height = 450,
   xAxisLabel = 'X Axis',
   yAxisLabel = 'Y Axis',
-  strokeColor = UCU_COLORS.gold,
+  strokeColor = UCU_COLORS.cyan,
   strokeWidth = 3,
   showLegend = true,
   showGrid = true,
@@ -266,7 +273,7 @@ export const SciBarChart = ({
   height = 450,
   xAxisLabel = 'Category',
   yAxisLabel = 'Value',
-  fillColor = UCU_COLORS.blue,
+  fillColor = '#4F46E5',
   showLegend = true,
   showGrid = true,
   margin = { top: 20, right: 30, left: 20, bottom: 100 },
@@ -343,7 +350,7 @@ export const SciBarChart = ({
             const columnSeries = new FastColumnRenderableSeries(wasmContext, {
               dataSeries,
               fill: seriesConfig.color || fillColor,
-              stroke: UCU_COLORS['blue-dark'],
+              stroke: '#312E81',
               strokeThickness: 1,
             });
 
@@ -361,7 +368,7 @@ export const SciBarChart = ({
           const columnSeries = new FastColumnRenderableSeries(wasmContext, {
             dataSeries,
             fill: fillColor,
-            stroke: UCU_COLORS['blue-dark'],
+            stroke: '#312E81',
             strokeThickness: 1,
           });
 
@@ -759,7 +766,7 @@ export const SciStackedColumnChart = ({
           const columnSeries = new FastColumnRenderableSeries(wasmContext, {
             dataSeries: categoryDataSeries,
             fill: colors[index % colors.length],
-            stroke: UCU_COLORS['blue-dark'],
+            stroke: '#312E81',
             strokeThickness: 1,
           });
 
