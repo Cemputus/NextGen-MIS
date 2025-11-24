@@ -25,13 +25,33 @@ import {
   LabelProvider,
 } from 'scichart';
 import { Loader2 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 
 // UCU Branding Colors
 const UCU_COLORS = {
   blue: '#003366',
   'blue-light': '#004080',
   'blue-dark': '#002244',
-  gold: '#FFD700',
+  maroon: '#800000',
+  'maroon-light': '#A00000',
+  'maroon-dark': '#600000',
+  gold: '#FFD700', // Keep for backward compatibility
   'gold-light': '#FFE44D',
   'gold-dark': '#CCAA00',
   navy: '#1a237e',
@@ -71,6 +91,12 @@ export const SciLineChart = ({
 
         const { wasmContext, sciChartSurface } = await SciChartSurface.create(chartRef.current, {
           theme: new SciChartJsNavyTheme(),
+        }).catch((err) => {
+          // Catch WASM loading errors
+          if (err.message && (err.message.includes('WebAssembly') || err.message.includes('WASM') || err.message.includes('wasm'))) {
+            throw new Error('WASM_LOAD_ERROR');
+          }
+          throw err;
         });
 
         // Create X axis (Category for string labels, Numeric for numbers)
@@ -149,7 +175,13 @@ export const SciLineChart = ({
         setLoading(false);
       } catch (err) {
         console.error('SciChart initialization error:', err);
-        setError(err.message);
+        // Check for WASM-related errors
+        const errorMessage = err.message || String(err);
+        if (errorMessage.includes('WebAssembly') || errorMessage.includes('WASM') || errorMessage.includes('wasm') || errorMessage === 'WASM_LOAD_ERROR') {
+          setError('WASM_LOAD_ERROR');
+        } else {
+          setError(errorMessage);
+        }
         setLoading(false);
       }
     };
@@ -163,6 +195,31 @@ export const SciLineChart = ({
     };
   }, [data, xDataKey, yDataKey, height, xAxisLabel, yAxisLabel, strokeColor, strokeWidth, showLegend, showGrid]);
 
+  // Fallback to Recharts if SciChart WASM fails to load
+  if (error && (error.includes('WebAssembly') || error.includes('WASM') || error.includes('wasm') || error === 'WASM_LOAD_ERROR')) {
+    console.warn('SciChart WASM not available, using Recharts fallback for LineChart');
+    return (
+      <div style={{ height: `${height}px`, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey={xDataKey} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line 
+              type="monotone" 
+              dataKey={yDataKey} 
+              stroke={strokeColor} 
+              strokeWidth={strokeWidth}
+              dot={{ fill: strokeColor, r: 4 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+  
   if (error) {
     return (
       <div className="h-full flex items-center justify-center text-red-600 border-2 border-dashed rounded-lg">
@@ -232,6 +289,12 @@ export const SciBarChart = ({
 
         const { wasmContext, sciChartSurface } = await SciChartSurface.create(chartRef.current, {
           theme: new SciChartJsNavyTheme(),
+        }).catch((err) => {
+          // Catch WASM loading errors
+          if (err.message && (err.message.includes('WebAssembly') || err.message.includes('WASM') || err.message.includes('wasm'))) {
+            throw new Error('WASM_LOAD_ERROR');
+          }
+          throw err;
         });
 
         // Create Category X axis
@@ -318,7 +381,13 @@ export const SciBarChart = ({
         setLoading(false);
       } catch (err) {
         console.error('SciChart initialization error:', err);
-        setError(err.message);
+        // Check for WASM-related errors
+        const errorMessage = err.message || String(err);
+        if (errorMessage.includes('WebAssembly') || errorMessage.includes('WASM') || errorMessage.includes('wasm') || errorMessage === 'WASM_LOAD_ERROR') {
+          setError('WASM_LOAD_ERROR');
+        } else {
+          setError(errorMessage);
+        }
         setLoading(false);
       }
     };
@@ -332,6 +401,31 @@ export const SciBarChart = ({
     };
   }, [data, xDataKey, yDataKey, yDataKeys, height, xAxisLabel, yAxisLabel, fillColor, showLegend, showGrid]);
 
+  // Fallback to Recharts if SciChart WASM fails to load
+  if (error && (error.includes('WebAssembly') || error.includes('WASM') || error.includes('wasm') || error === 'WASM_LOAD_ERROR')) {
+    console.warn('SciChart WASM not available, using Recharts fallback for BarChart');
+    return (
+      <div style={{ height: `${height}px`, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey={xDataKey} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            {yDataKeys && Array.isArray(yDataKeys) && yDataKeys.length > 0 ? (
+              yDataKeys.map((seriesConfig, index) => (
+                <Bar key={index} dataKey={seriesConfig.key} fill={seriesConfig.color || fillColor} />
+              ))
+            ) : (
+              <Bar dataKey={yDataKey} fill={fillColor} />
+            )}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+  
   if (error) {
     return (
       <div className="h-full flex items-center justify-center text-red-600 border-2 border-dashed rounded-lg">
@@ -401,6 +495,12 @@ export const SciAreaChart = ({
 
         const { wasmContext, sciChartSurface } = await SciChartSurface.create(chartRef.current, {
           theme: new SciChartJsNavyTheme(),
+        }).catch((err) => {
+          // Catch WASM loading errors
+          if (err.message && (err.message.includes('WebAssembly') || err.message.includes('WASM') || err.message.includes('wasm'))) {
+            throw new Error('WASM_LOAD_ERROR');
+          }
+          throw err;
         });
 
         // Create X axis
@@ -482,7 +582,13 @@ export const SciAreaChart = ({
         setLoading(false);
       } catch (err) {
         console.error('SciChart initialization error:', err);
-        setError(err.message);
+        // Check for WASM-related errors
+        const errorMessage = err.message || String(err);
+        if (errorMessage.includes('WebAssembly') || errorMessage.includes('WASM') || errorMessage.includes('wasm') || errorMessage === 'WASM_LOAD_ERROR') {
+          setError('WASM_LOAD_ERROR');
+        } else {
+          setError(errorMessage);
+        }
         setLoading(false);
       }
     };
@@ -496,6 +602,31 @@ export const SciAreaChart = ({
     };
   }, [data, xDataKey, yDataKey, height, xAxisLabel, yAxisLabel, fillColor, strokeColor, strokeWidth, showLegend, showGrid]);
 
+  // Fallback to Recharts if SciChart WASM fails to load
+  if (error && (error.includes('WebAssembly') || error.includes('WASM') || error.includes('wasm') || error === 'WASM_LOAD_ERROR')) {
+    console.warn('SciChart WASM not available, using Recharts fallback for AreaChart');
+    return (
+      <div style={{ height: `${height}px`, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey={xDataKey} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Area 
+              type="monotone" 
+              dataKey={yDataKey} 
+              stroke={strokeColor} 
+              fill={fillColor}
+              fillOpacity={0.6}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+  
   if (error) {
     return (
       <div className="h-full flex items-center justify-center text-red-600 border-2 border-dashed rounded-lg">
@@ -565,6 +696,12 @@ export const SciStackedColumnChart = ({
 
         const { wasmContext, sciChartSurface } = await SciChartSurface.create(chartRef.current, {
           theme: new SciChartJsNavyTheme(),
+        }).catch((err) => {
+          // Catch WASM loading errors
+          if (err.message && (err.message.includes('WebAssembly') || err.message.includes('WASM') || err.message.includes('wasm'))) {
+            throw new Error('WASM_LOAD_ERROR');
+          }
+          throw err;
         });
 
         // Create Category X axis
@@ -642,7 +779,13 @@ export const SciStackedColumnChart = ({
         setLoading(false);
       } catch (err) {
         console.error('SciChart initialization error:', err);
-        setError(err.message);
+        // Check for WASM-related errors
+        const errorMessage = err.message || String(err);
+        if (errorMessage.includes('WebAssembly') || errorMessage.includes('WASM') || errorMessage.includes('wasm') || errorMessage === 'WASM_LOAD_ERROR') {
+          setError('WASM_LOAD_ERROR');
+        } else {
+          setError(errorMessage);
+        }
         setLoading(false);
       }
     };
@@ -656,6 +799,36 @@ export const SciStackedColumnChart = ({
     };
   }, [data, xDataKey, yDataKey, height, xAxisLabel, yAxisLabel, colors, showLegend, showGrid, showPercentages]);
 
+  // Fallback to Recharts Pie Chart if SciChart WASM fails to load
+  if (error && (error.includes('WebAssembly') || error.includes('WASM'))) {
+    console.warn('SciChart WASM not available, using Recharts PieChart fallback');
+    const total = data.reduce((sum, d) => sum + (d[yDataKey] || 0), 0);
+    return (
+      <div style={{ height: `${height}px`, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+              outerRadius={120}
+              fill="#8884d8"
+              dataKey={yDataKey}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+              ))}
+            </Pie>
+            <Tooltip />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+  
   if (error) {
     return (
       <div className="h-full flex items-center justify-center text-red-600 border-2 border-dashed rounded-lg">

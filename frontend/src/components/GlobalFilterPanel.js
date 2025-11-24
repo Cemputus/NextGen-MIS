@@ -195,8 +195,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
               >
                 <option value="">All Faculties</option>
-                {filterOptions.faculties?.map(f => (
-                  <option key={f.faculty_id} value={f.faculty_id}>
+                {filterOptions.faculties?.map((f, idx) => (
+                  <option key={`faculty-${f.faculty_id}-${idx}`} value={f.faculty_id}>
                     {f.faculty_name}
                   </option>
                 ))}
@@ -213,8 +213,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 <option value="">
                   {filters.faculty_id ? 'All Departments' : 'Select Faculty First'}
                 </option>
-                {filterOptions.departments?.map(d => (
-                  <option key={d.department_id} value={d.department_id}>
+                {filterOptions.departments?.map((d, idx) => (
+                  <option key={`dept-${d.department_id || idx}`} value={d.department_id}>
                     {d.department_name}
                   </option>
                 ))}
@@ -231,8 +231,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 <option value="">
                   {filters.faculty_id ? 'All Programs' : 'Select Faculty First'}
                 </option>
-                {filterOptions.programs?.map(p => (
-                  <option key={p.program_id} value={p.program_id}>
+                {filterOptions.programs?.map((p, idx) => (
+                  <option key={`prog-${p.program_id || idx}`} value={p.program_id}>
                     {p.program_name}
                   </option>
                 ))}
@@ -245,8 +245,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
               >
                 <option value="">All Courses</option>
-                {filterOptions.courses?.map(c => (
-                  <option key={c.course_code} value={c.course_code}>
+                {filterOptions.courses?.map((c, idx) => (
+                  <option key={`course-${c.course_code || idx}`} value={c.course_code}>
                     {c.course_code} - {c.course_name?.substring(0, 40) || ''}
                   </option>
                 ))}
@@ -259,8 +259,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
               >
                 <option value="">All Semesters</option>
-                {filterOptions.semesters?.map(s => (
-                  <option key={s.semester_id} value={s.semester_id}>
+                {filterOptions.semesters?.map((s, idx) => (
+                  <option key={`sem-${s.semester_id || idx}`} value={s.semester_id}>
                     {s.semester_name}
                   </option>
                 ))}
@@ -273,8 +273,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
               >
                 <option value="">All High Schools</option>
-                {filterOptions.high_schools?.map(hs => (
-                  <option key={hs.high_school} value={hs.high_school}>
+                {filterOptions.high_schools?.map((hs, idx) => (
+                  <option key={`hs-${idx}-${hs.high_school || idx}`} value={hs.high_school}>
                     {hs.high_school}
                   </option>
                 ))}
@@ -287,8 +287,8 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                 className="h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500"
               >
                 <option value="">All Years</option>
-                {filterOptions.intake_years?.map(year => (
-                  <option key={year} value={year}>
+                {filterOptions.intake_years?.map((year, idx) => (
+                  <option key={`year-${year || idx}`} value={year}>
                     {year}
                   </option>
                 ))}
@@ -304,7 +304,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-700">Active filters:</span>
-                  {Object.entries(filters).map(([key, value]) => {
+                  {Object.entries(filters).map(([key, value], idx) => {
                     if (!value) return null;
                     const displayValue = filterOptions.faculties?.find(f => f.faculty_id == value)?.faculty_name ||
                                          filterOptions.departments?.find(d => d.department_id == value)?.department_name ||
@@ -312,7 +312,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [], pageName = 'glob
                                          value;
                     return (
                       <Badge
-                        key={key}
+                        key={`filter-${key}-${value}-${idx}`}
                         variant="secondary"
                         className="gap-1 pr-1 bg-blue-100 text-blue-700 border-blue-200 font-medium"
                       >

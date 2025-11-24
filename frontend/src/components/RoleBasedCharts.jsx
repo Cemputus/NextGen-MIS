@@ -19,14 +19,15 @@ import { SciLineChart, SciBarChart, SciAreaChart, SciStackedColumnChart, UCU_COL
 
 // Enhanced Chart color palettes with UCU branding
 const DEPT_COLORS = [UCU_COLORS.blue, UCU_COLORS['blue-light'], '#0059b3', '#0073e6'];
-const PAYMENT_COLORS = ['#10b981', '#34d399', UCU_COLORS.gold, '#f59e0b', '#ef4444'];
-const GRADE_COLORS = [UCU_COLORS.gold, UCU_COLORS['gold-light'], '#FFD700', UCU_COLORS['gold-dark'], '#f59e0b'];
+const PAYMENT_COLORS = ['#10b981', '#34d399', UCU_COLORS.maroon, '#f59e0b', '#ef4444'];
+const GRADE_COLORS = [UCU_COLORS.maroon, UCU_COLORS['gold-light'], '#FFD700', UCU_COLORS['gold-dark'], '#f59e0b'];
 const ATTENDANCE_COLORS = [UCU_COLORS.blue, UCU_COLORS['blue-light'], '#0059b3'];
 
 const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
   const { user } = useAuth();
   const role = user?.role || 'student';
   const isFinancePage = type === 'finance';
+  const isAcademicPage = type === 'academic';
   
   const [chartData, setChartData] = useState({
     studentDistribution: [],
@@ -75,7 +76,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       }
       
       // Payment Status (for Dean, HOD, Student, Finance, Senate)
-      if (isFinancePage || ['dean', 'hod', 'student', 'finance', 'senate'].includes(role)) {
+      if (!isAcademicPage && (isFinancePage || ['dean', 'hod', 'student', 'finance', 'senate'].includes(role))) {
         requests.push(
           axios.get('/api/dashboard/payment-status', {
             headers: { Authorization: `Bearer ${token}` },
@@ -105,7 +106,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       }
       
       // Payment Trends - For Finance pages and Finance/Senate roles
-      if (isFinancePage || role === 'finance' || role === 'senate') {
+      if (!isAcademicPage && (isFinancePage || role === 'finance' || role === 'senate')) {
         requests.push(
           axios.get('/api/dashboard/payment-trends', {
             headers: { Authorization: `Bearer ${token}` },
@@ -165,7 +166,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       }
       
       // Process Payment Status
-      if (isFinancePage || ['dean', 'hod', 'student', 'finance', 'senate'].includes(role)) {
+      if (!isAcademicPage && (isFinancePage || ['dean', 'hod', 'student', 'finance', 'senate'].includes(role))) {
         const paymentsRes = results[resultIndex++];
         data.paymentStatus = paymentsRes.data.statuses?.map((status, idx) => ({
           name: status,
@@ -192,7 +193,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       }
       
       // Process Payment Trends - For Finance pages and Finance/Senate roles
-      if (isFinancePage || role === 'finance' || role === 'senate') {
+      if (!isAcademicPage && (isFinancePage || role === 'finance' || role === 'senate')) {
         const trendsRes = results[resultIndex++];
         data.paymentTrends = trendsRes.data.periods?.map((period, idx) => ({
           period,
@@ -283,7 +284,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Trend Analysis of Grades Over Time - Role-specific (NOT for Finance) */}
         {!isFinancePage && role !== 'finance' && (
-          <Card className="bg-gradient-to-br from-white via-yellow-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '5px' }}>
+          <Card className="bg-gradient-to-br from-white via-yellow-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.maroon, borderLeftWidth: '5px' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-xl font-bold" style={{ color: UCU_COLORS.navy }}>Trend Analysis of Grades Over Time</CardTitle>
               <CardDescription className="text-sm">
@@ -303,7 +304,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                   height={450}
                   xAxisLabel="Time Period (Quarter)"
                   yAxisLabel="Average Grade (%)"
-                  strokeColor={UCU_COLORS.gold}
+                  strokeColor={UCU_COLORS.maroon}
                   strokeWidth={4}
                   showLegend={true}
                   showGrid={true}
@@ -314,7 +315,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         )}
 
         {/* Payment Status Distribution - Role-specific (ALWAYS for Finance pages) */}
-        {(isFinancePage || ['dean', 'hod', 'student', 'finance', 'senate'].includes(role)) && (
+        {!isAcademicPage && (isFinancePage || ['dean', 'hod', 'student', 'finance', 'senate'].includes(role)) && (
           <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: '#10b981', borderLeftWidth: '5px' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-xl font-bold" style={{ color: '#10b981' }}>
@@ -401,7 +402,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Grade Distribution - NOT for Finance */}
         {!isFinancePage && role !== 'finance' && (
-          <Card className="bg-gradient-to-br from-white via-orange-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '5px' }}>
+          <Card className="bg-gradient-to-br from-white via-orange-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.maroon, borderLeftWidth: '5px' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-xl font-bold" style={{ color: UCU_COLORS.navy }}>Grade Distribution</CardTitle>
               <CardDescription className="text-sm">Distribution of letter grades across all students</CardDescription>
@@ -427,7 +428,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
 
         {/* Top 10 Students - Role-specific scope (NOT for Finance) */}
         {!isFinancePage && ['senate', 'dean', 'hod', 'staff'].includes(role) && (
-          <Card className="bg-gradient-to-br from-white via-red-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '5px' }}>
+          <Card className="bg-gradient-to-br from-white via-red-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.maroon, borderLeftWidth: '5px' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-xl font-bold" style={{ color: UCU_COLORS.navy }}>Top 10 Students</CardTitle>
               <CardDescription className="text-sm">
@@ -446,7 +447,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                   height={450}
                   xAxisLabel="Student Name"
                   yAxisLabel="Average Grade (%)"
-                  fillColor={UCU_COLORS.gold}
+                  fillColor={UCU_COLORS.maroon}
                   showLegend={true}
                   showGrid={true}
                 />
@@ -456,7 +457,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
         )}
 
         {/* Payment Trends - Finance and Senate (ALWAYS for Finance pages) */}
-        {(isFinancePage || role === 'finance' || role === 'senate') && (
+        {!isAcademicPage && (isFinancePage || role === 'finance' || role === 'senate') && (
           <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: '#10b981', borderLeftWidth: '5px' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-xl font-bold" style={{ color: '#10b981' }}>Payment Trends Over Time</CardTitle>
@@ -485,7 +486,7 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
 
       {/* Attendance Trends - NOT for Finance, but Senate should see this */}
       {!isFinancePage && role !== 'finance' && (
-        <Card className="bg-gradient-to-br from-white via-yellow-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.gold, borderLeftWidth: '5px' }}>
+        <Card className="bg-gradient-to-br from-white via-yellow-50/30 to-white border-2 shadow-xl" style={{ borderLeftColor: UCU_COLORS.maroon, borderLeftWidth: '5px' }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-xl font-bold" style={{ color: UCU_COLORS.navy }}>Attendance Trends</CardTitle>
             <CardDescription className="text-sm">
@@ -505,8 +506,8 @@ const RoleBasedCharts = ({ filters = {}, type = 'general' }) => {
                 height={450}
                 xAxisLabel="Time Period (Quarter)"
                 yAxisLabel="Average Attendance (Hours)"
-                fillColor={UCU_COLORS.gold}
-                strokeColor={UCU_COLORS.gold}
+                fillColor={UCU_COLORS.maroon}
+                strokeColor={UCU_COLORS.maroon}
                 strokeWidth={3}
                 showLegend={true}
                 showGrid={true}

@@ -147,7 +147,7 @@ const SenateDashboard = () => {
                   <CardDescription>Institution-wide academic metrics and trends</CardDescription>
                 </CardHeader>
                 <CardContent data-chart-container="true" data-chart-title="Academic Performance">
-                  <RoleBasedCharts filters={filters} type="institution" />
+                  <RoleBasedCharts filters={filters} type="academic" />
                 </CardContent>
               </Card>
             </TabsContent>

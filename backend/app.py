@@ -370,7 +370,8 @@ def get_grades_over_time():
         {join_clause}
         {where_clause}
         GROUP BY dt.year, QUARTER(dt.date_value)
-        ORDER BY dt.year, QUARTER(dt.date_value)
+        HAVING COUNT(CASE WHEN fg.exam_status = 'Completed' THEN 1 END) > 0
+        ORDER BY dt.year ASC, QUARTER(dt.date_value) ASC
         """
         
         df = pd.read_sql_query(text(query), engine)
@@ -714,7 +715,8 @@ def get_attendance_trends():
         {join_clause}
         {where_clause}
         GROUP BY dt.year, QUARTER(dt.date_value)
-        ORDER BY dt.year, QUARTER(dt.date_value)
+        HAVING COUNT(DISTINCT fa.student_id) > 0
+        ORDER BY dt.year ASC, QUARTER(dt.date_value) ASC
         """
         
         df = pd.read_sql_query(text(query), engine)
@@ -817,8 +819,8 @@ def get_payment_trends():
         return jsonify({
             'periods': df['period'].tolist(),
             'amounts': df['total_amount'].round(2).tolist(),
-            'completed_count': df['completed_count'].tolist(),
-            'pending_count': df['pending_count'].tolist()
+            'completed_payments': df['completed_count'].tolist(),
+            'pending_payments': df['pending_count'].tolist()
         })
     except Exception as e:
         print(f"Error in get_payment_trends: {e}")
