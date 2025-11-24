@@ -51,6 +51,15 @@ try:
 except:
     print("Models not loaded. Train models first.")
 
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Backend server is running',
+        'timestamp': datetime.now().isoformat()
+    }), 200
+
 @app.route('/api/dashboard/stats', methods=['GET'])
 @jwt_required()
 def get_dashboard_stats():

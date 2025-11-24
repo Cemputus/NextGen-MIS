@@ -30,6 +30,29 @@ import FEXAnalytics from './pages/FEXAnalytics';
 import HighSchoolAnalytics from './pages/HighSchoolAnalytics';
 import ProfilePage from './pages/ProfilePage';
 import PredictionPage from './pages/PredictionPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import ReportsPage from './pages/ReportsPage';
+
+// Student Pages
+import StudentGrades from './pages/StudentGrades';
+import StudentAttendance from './pages/StudentAttendance';
+import StudentPayments from './pages/StudentPayments';
+
+// Staff Pages
+import StaffClasses from './pages/StaffClasses';
+import StaffAnalytics from './pages/StaffAnalytics';
+
+// Admin Pages
+import AdminUsers from './pages/AdminUsers';
+import AdminSettings from './pages/AdminSettings';
+import AdminETL from './pages/AdminETL';
+import AdminAudit from './pages/AdminAudit';
+
+// HR Pages
+import HRStaff from './pages/HRStaff';
+
+// Finance Pages
+import FinancePayments from './pages/FinancePayments';
 
 function PrivateRoute({ children, requiredRole = null }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -81,9 +104,9 @@ function App() {
                 <PrivateRoute requiredRole="student">
                   <Routes>
                     <Route path="dashboard" element={<StudentDashboard />} />
-                    <Route path="grades" element={<StudentDashboard />} />
-                    <Route path="attendance" element={<StudentDashboard />} />
-                    <Route path="payments" element={<StudentDashboard />} />
+                    <Route path="grades" element={<StudentGrades />} />
+                    <Route path="attendance" element={<StudentAttendance />} />
+                    <Route path="payments" element={<StudentPayments />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="predictions" element={<PredictionPage />} />
                     <Route path="*" element={<Navigate to="/student/dashboard" />} />
@@ -99,8 +122,8 @@ function App() {
                 <PrivateRoute requiredRole="staff">
                   <Routes>
                     <Route path="dashboard" element={<StaffDashboard />} />
-                    <Route path="classes" element={<StaffDashboard />} />
-                    <Route path="analytics" element={<StaffDashboard />} />
+                    <Route path="classes" element={<StaffClasses />} />
+                    <Route path="analytics" element={<StaffAnalytics />} />
                     <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/staff/dashboard" />} />
@@ -116,7 +139,7 @@ function App() {
                 <PrivateRoute requiredRole="hod">
                   <Routes>
                     <Route path="dashboard" element={<HODDashboard />} />
-                    <Route path="analytics" element={<HODDashboard />} />
+                    <Route path="analytics" element={<AnalyticsPage type="hod" />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
                     <Route path="predictions" element={<PredictionPage />} />
@@ -134,7 +157,7 @@ function App() {
                 <PrivateRoute requiredRole="dean">
                   <Routes>
                     <Route path="dashboard" element={<DeanDashboard />} />
-                    <Route path="analytics" element={<DeanDashboard />} />
+                    <Route path="analytics" element={<AnalyticsPage type="dean" />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
                     <Route path="predictions" element={<PredictionPage />} />
@@ -152,10 +175,11 @@ function App() {
                 <PrivateRoute requiredRole="senate">
                   <Routes>
                     <Route path="dashboard" element={<SenateDashboard />} />
-                    <Route path="analytics" element={<SenateDashboard />} />
+                    <Route path="analytics" element={<AnalyticsPage type="senate" />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
-                    <Route path="reports" element={<SenateDashboard />} />
+                    <Route path="reports" element={<ReportsPage />} />
+                    <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/senate/dashboard" />} />
                   </Routes>
@@ -170,11 +194,11 @@ function App() {
                 <PrivateRoute requiredRole="analyst">
                   <Routes>
                     <Route path="dashboard" element={<AnalystDashboard />} />
-                    <Route path="analytics" element={<AnalystDashboard />} />
+                    <Route path="analytics" element={<AnalyticsPage type="analyst" />} />
                     <Route path="fex" element={<FEXAnalytics />} />
                     <Route path="high-school" element={<HighSchoolAnalytics />} />
                     <Route path="predictions" element={<PredictionPage />} />
-                    <Route path="reports" element={<AnalystDashboard />} />
+                    <Route path="reports" element={<ReportsPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/analyst/dashboard" />} />
                   </Routes>
@@ -189,10 +213,10 @@ function App() {
                 <PrivateRoute requiredRole="sysadmin">
                   <Routes>
                     <Route path="dashboard" element={<AdminDashboard />} />
-                    <Route path="users" element={<AdminDashboard />} />
-                    <Route path="settings" element={<AdminDashboard />} />
-                    <Route path="etl" element={<AdminDashboard />} />
-                    <Route path="audit" element={<AdminDashboard />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="settings" element={<AdminSettings />} />
+                    <Route path="etl" element={<AdminETL />} />
+                    <Route path="audit" element={<AdminAudit />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/admin/dashboard" />} />
                   </Routes>
@@ -207,8 +231,8 @@ function App() {
                 <PrivateRoute requiredRole="hr">
                   <Routes>
                     <Route path="dashboard" element={<HRDashboard />} />
-                    <Route path="analytics" element={<HRDashboard />} />
-                    <Route path="staff" element={<HRDashboard />} />
+                    <Route path="analytics" element={<AnalyticsPage type="hr" />} />
+                    <Route path="staff" element={<HRStaff />} />
                     <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/hr/dashboard" />} />
@@ -224,8 +248,8 @@ function App() {
                 <PrivateRoute requiredRole="finance">
                   <Routes>
                     <Route path="dashboard" element={<FinanceDashboard />} />
-                    <Route path="analytics" element={<FinanceDashboard />} />
-                    <Route path="payments" element={<FinanceDashboard />} />
+                    <Route path="analytics" element={<AnalyticsPage type="finance" />} />
+                    <Route path="payments" element={<FinancePayments />} />
                     <Route path="predictions" element={<PredictionPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/finance/dashboard" />} />

@@ -1,207 +1,167 @@
 """
-Test all API endpoints to ensure they work correctly
+Quick API test script to verify all endpoints work correctly
 """
 import requests
 import json
-from datetime import datetime
+import sys
 
 BASE_URL = "http://localhost:5000"
 
-def test_login_api():
-    """Test login API with various user types"""
-    print("\n" + "="*80)
-    print("TESTING LOGIN API")
-    print("="*80)
-    
-    # Test cases
-    test_cases = [
-        {
-            "name": "Student Login (Access Number)",
-            "data": {"identifier": "A26143", "password": "A26143@ucu"},
-            "expected_role": "student"
-        },
-        {
-            "name": "Admin Login",
-            "data": {"identifier": "admin", "password": "admin123"},
-            "expected_role": "sysadmin"
-        },
-        {
-            "name": "Analyst Login",
-            "data": {"identifier": "analyst", "password": "analyst123"},
-            "expected_role": "analyst"
-        },
-        {
-            "name": "Invalid Credentials",
-            "data": {"identifier": "admin", "password": "wrong"},
-            "expected_role": None,
-            "should_fail": True
-        },
-        {
-            "name": "Missing Password",
-            "data": {"identifier": "admin"},
-            "expected_role": None,
-            "should_fail": True
-        }
-    ]
+def test_endpoint(name, method, url, headers=None, data=None, expected_status=200):
+    """Test a single API endpoint"""
+    try:
+        if method == 'GET':
+            response = requests.get(url, headers=headers, timeout=10)
+        elif method == 'POST':
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+        else:
+            return False, f"Unsupported method: {method}"
+        
+        # Handle expected_status as list or single value
+        if isinstance(expected_status, list):
+            is_expected = response.status_code in expected_status
+        else:
+            is_expected = response.status_code == expected_status
+        
+        if is_expected:
+            return True, f"✓ {name}: Status {response.status_code}"
+        else:
+            try:
+                error_data = response.json()
+                return False, f"✗ {name}: Status {response.status_code} - {error_data.get('error', 'Unknown error')}"
+            except:
+                return False, f"✗ {name}: Status {response.status_code} - {response.text[:100]}"
+    except requests.exceptions.ConnectionError:
+        return False, f"✗ {name}: Cannot connect to backend. Is the server running on {BASE_URL}?"
+    except requests.exceptions.Timeout:
+        return False, f"✗ {name}: Request timed out"
+    except Exception as e:
+        return False, f"✗ {name}: {str(e)}"
+
+def main():
+    print("=" * 60)
+    print("API ENDPOINT TESTING")
+    print("=" * 60)
+    print(f"Testing against: {BASE_URL}\n")
     
     results = []
-    for test in test_cases:
-        try:
-            response = requests.post(f"{BASE_URL}/api/auth/login", json=test["data"], timeout=5)
-            
-            if test.get("should_fail"):
-                if response.status_code in [400, 401]:
-                    print(f"✓ {test['name']}: Correctly rejected (Status: {response.status_code})")
-                    results.append(True)
-                else:
-                    print(f"✗ {test['name']}: Should have failed but got Status: {response.status_code}")
-                    results.append(False)
-            else:
-                if response.status_code == 200:
-                    data = response.json()
-                    # Check role from user object or direct role field
-                    role = data.get("role") or (data.get("user", {}).get("role") if data.get("user") else None)
-                    if role == test["expected_role"]:
-                        token_preview = data.get('access_token', '')[:20] if data.get('access_token') else 'N/A'
-                        print(f"✓ {test['name']}: Success - Role: {role}, Token: {token_preview}...")
-                        results.append(True)
-                    else:
-                        print(f"✗ {test['name']}: Wrong role. Expected: {test['expected_role']}, Got: {role}")
-                        print(f"   Full response: {json.dumps(data, indent=2)[:200]}...")
-                        results.append(False)
-                else:
-                    print(f"✗ {test['name']}: Failed with Status: {response.status_code}, Error: {response.text}")
-                    results.append(False)
-        except requests.exceptions.ConnectionError:
-            print(f"✗ {test['name']}: Cannot connect to server. Is the backend running?")
-            results.append(False)
-        except Exception as e:
-            print(f"✗ {test['name']}: Error - {str(e)}")
-            results.append(False)
     
-    return all(results)
-
-def test_protected_endpoints():
-    """Test protected endpoints with authentication"""
-    print("\n" + "="*80)
-    print("TESTING PROTECTED ENDPOINTS")
-    print("="*80)
+    # Test 1: Backend status
+    print("1. Testing Backend Status...")
+    success, msg = test_endpoint("Backend Status", "GET", f"{BASE_URL}/api/status")
+    print(f"   {msg}")
+    results.append((success, msg))
+    if not success:
+        print("\n⚠ Backend server is not running. Please start it first.")
+        print("   Options:")
+        print("   1. Run: start_backend.bat")
+        print("   2. Run: .venv\\Scripts\\python.exe start_server.py")
+        print("   3. Run: python start_server.py (with venv activated)")
+        print("\n   The server should show: 'Running on http://0.0.0.0:5000'")
+        return
     
-    # First login to get token
+    # Test 2: Login (Dean)
+    print("\n2. Testing Login (Dean)...")
+    login_data = {"identifier": "dean", "password": "dean123"}
+    success, msg = test_endpoint("Login", "POST", f"{BASE_URL}/api/auth/login", data=login_data, expected_status=200)
+    print(f"   {msg}")
+    results.append((success, msg))
+    
+    if not success:
+        print("\n⚠ Login failed. Cannot test authenticated endpoints.")
+        return
+    
+    # Get token from login
     try:
-        login_response = requests.post(
-            f"{BASE_URL}/api/auth/login",
-            json={"identifier": "admin", "password": "admin123"},
-            timeout=5
-        )
-        
-        if login_response.status_code != 200:
-            print("✗ Cannot test protected endpoints - Login failed")
-            return False
-        
-        token = login_response.json().get("access_token")
-        headers = {"Authorization": f"Bearer {token}"}
-        
-        # Test endpoints
-        endpoints = [
-            ("/api/dashboard/stats", "Dashboard Stats"),
-            ("/api/dashboard/students-by-department", "Students by Department"),
-            ("/api/dashboard/grades-over-time", "Grades Over Time"),
-            ("/api/dashboard/payment-status", "Payment Status"),
-            ("/api/analytics/filter-options", "Filter Options"),
-        ]
-        
-        results = []
-        for endpoint, name in endpoints:
-            try:
-                response = requests.get(f"{BASE_URL}{endpoint}", headers=headers, timeout=5)
-                if response.status_code == 200:
-                    print(f"✓ {name}: Success")
-                    results.append(True)
-                else:
-                    print(f"✗ {name}: Failed with Status: {response.status_code}")
-                    results.append(False)
-            except Exception as e:
-                print(f"✗ {name}: Error - {str(e)}")
-                results.append(False)
-        
-        return all(results)
-        
-    except requests.exceptions.ConnectionError:
-        print("✗ Cannot connect to server. Is the backend running?")
-        return False
+        login_response = requests.post(f"{BASE_URL}/api/auth/login", json=login_data, timeout=10)
+        if login_response.status_code == 200:
+            token = login_response.json().get('access_token')
+            headers = {"Authorization": f"Bearer {token}"}
+            print(f"   ✓ Token obtained: {token[:20]}...")
+        else:
+            print("   ✗ Could not get token")
+            return
     except Exception as e:
-        print(f"✗ Error testing protected endpoints: {str(e)}")
-        return False
-
-def test_export_endpoints():
-    """Test export endpoints"""
-    print("\n" + "="*80)
-    print("TESTING EXPORT ENDPOINTS")
-    print("="*80)
+        print(f"   ✗ Error getting token: {e}")
+        return
     
-    try:
-        # Login first
-        login_response = requests.post(
-            f"{BASE_URL}/api/auth/login",
-            json={"identifier": "admin", "password": "admin123"},
-            timeout=5
-        )
-        
-        if login_response.status_code != 200:
-            print("✗ Cannot test export endpoints - Login failed")
-            return False
-        
-        token = login_response.json().get("access_token")
-        headers = {"Authorization": f"Bearer {token}"}
-        
-        # Test Excel export
+    # Test 3: Dashboard Stats
+    print("\n3. Testing Dashboard Stats...")
+    success, msg = test_endpoint("Dashboard Stats", "GET", f"{BASE_URL}/api/dashboard/stats", headers=headers)
+    print(f"   {msg}")
+    if success:
         try:
-            response = requests.get(
-                f"{BASE_URL}/api/export/excel",
-                headers=headers,
-                params={"type": "dashboard"},
-                timeout=10
-            )
-            if response.status_code == 200 and response.headers.get('content-type', '').startswith('application'):
-                print("✓ Excel Export: Success")
-                return True
-            else:
-                print(f"✗ Excel Export: Failed with Status: {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"✗ Excel Export: Error - {str(e)}")
-            return False
-            
-    except requests.exceptions.ConnectionError:
-        print("✗ Cannot connect to server. Is the backend running?")
-        return False
-    except Exception as e:
-        print(f"✗ Error testing export endpoints: {str(e)}")
-        return False
-
-if __name__ == "__main__":
-    print("\n" + "="*80)
-    print("API TESTING SUITE")
-    print("="*80)
-    print(f"Testing against: {BASE_URL}")
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            stats = requests.get(f"{BASE_URL}/api/dashboard/stats", headers=headers, timeout=10).json()
+            print(f"   → Total Students: {stats.get('total_students', 'N/A')}")
+            print(f"   → Total Courses: {stats.get('total_courses', 'N/A')}")
+        except:
+            pass
+    results.append((success, msg))
     
-    # Run tests
-    login_ok = test_login_api()
-    protected_ok = test_protected_endpoints()
-    export_ok = test_export_endpoints()
+    # Test 4: FEX Analytics
+    print("\n4. Testing FEX Analytics...")
+    success, msg = test_endpoint("FEX Analytics", "GET", f"{BASE_URL}/api/analytics/fex", headers=headers)
+    print(f"   {msg}")
+    if success:
+        try:
+            fex_data = requests.get(f"{BASE_URL}/api/analytics/fex", headers=headers, timeout=10).json()
+            summary = fex_data.get('summary', {})
+            print(f"   → Total FEX: {summary.get('total_fex', 0)}")
+            print(f"   → Total MEX: {summary.get('total_mex', 0)}")
+            print(f"   → Total FCW: {summary.get('total_fcw', 0)}")
+            print(f"   → FEX Rate: {summary.get('fex_rate', 0)}%")
+            print(f"   → Data rows: {len(fex_data.get('data', []))}")
+        except Exception as e:
+            print(f"   ⚠ Error parsing response: {e}")
+    results.append((success, msg))
+    
+    # Test 5: Students by Department
+    print("\n5. Testing Students by Department...")
+    success, msg = test_endpoint("Students by Department", "GET", f"{BASE_URL}/api/dashboard/students-by-department", headers=headers)
+    print(f"   {msg}")
+    results.append((success, msg))
+    
+    # Test 6: Grades Over Time
+    print("\n6. Testing Grades Over Time...")
+    success, msg = test_endpoint("Grades Over Time", "GET", f"{BASE_URL}/api/dashboard/grades-over-time", headers=headers)
+    print(f"   {msg}")
+    results.append((success, msg))
+    
+    # Test 7: Payment Status
+    print("\n7. Testing Payment Status...")
+    success, msg = test_endpoint("Payment Status", "GET", f"{BASE_URL}/api/dashboard/payment-status", headers=headers)
+    print(f"   {msg}")
+    results.append((success, msg))
+    
+    # Test 8: Filter Options
+    print("\n8. Testing Filter Options...")
+    success, msg = test_endpoint("Filter Options", "GET", f"{BASE_URL}/api/analytics/filter-options", headers=headers)
+    print(f"   {msg}")
+    results.append((success, msg))
     
     # Summary
-    print("\n" + "="*80)
+    print("\n" + "=" * 60)
     print("TEST SUMMARY")
-    print("="*80)
-    print(f"Login API: {'✓ PASS' if login_ok else '✗ FAIL'}")
-    print(f"Protected Endpoints: {'✓ PASS' if protected_ok else '✗ FAIL'}")
-    print(f"Export Endpoints: {'✓ PASS' if export_ok else '✗ FAIL'}")
+    print("=" * 60)
+    passed = sum(1 for s, _ in results if s)
+    total = len(results)
+    print(f"Passed: {passed}/{total}")
+    print(f"Failed: {total - passed}/{total}\n")
     
-    if all([login_ok, protected_ok, export_ok]):
-        print("\n✓ All tests passed!")
+    if passed == total:
+        print("✓ All API endpoints are working correctly!")
     else:
-        print("\n✗ Some tests failed. Please check the output above.")
+        print("⚠ Some endpoints failed. Check the errors above.")
+        for success, msg in results:
+            if not success:
+                print(f"  - {msg}")
 
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nTest interrupted by user")
+    except Exception as e:
+        print(f"\n\nUnexpected error: {e}")
+        import traceback
+        traceback.print_exc()

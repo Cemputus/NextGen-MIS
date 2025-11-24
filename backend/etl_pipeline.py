@@ -758,8 +758,9 @@ class ETLPipeline:
         self.logger.info("Populating time dimension...")
         print("Populating time dimension...")
         
-        # Generate dates from 2023-01-01 to 2025-12-31
-        dates = pd.date_range(start='2023-01-01', end='2025-12-31', freq='D')
+        # Generate dates from 2022-01-01 to 2026-12-31 to cover all payment dates
+        # This ensures we have dates for historical payments (2022) and future dates (2025-2026)
+        dates = pd.date_range(start='2022-01-01', end='2026-12-31', freq='D')
         time_dim = pd.DataFrame({
             'date_key': [d.strftime('%Y%m%d') for d in dates],
             'date': dates,
@@ -772,6 +773,11 @@ class ETLPipeline:
             'day_name': dates.strftime('%A'),
             'is_weekend': dates.dayofweek >= 5
         })
+        
+        # Clear existing time dimension data first
+        with engine.connect() as conn:
+            conn.execute(text("DELETE FROM dim_time"))
+            conn.commit()
         
         time_dim.to_sql('dim_time', engine, if_exists='append', index=False, method='multi', chunksize=1000)
         self.logger.info(f"  → Loaded {len(time_dim)} time dimension records")
@@ -1186,12 +1192,25 @@ class ETLPipeline:
         fact_payment = payments[available_cols].copy()
         fact_payment = fact_payment[fact_payment['date_key'] != '']  # Remove invalid dates
         
+        # Filter to only include date_keys that exist in dim_time
+        if not fact_payment.empty:
+            with engine.connect() as conn:
+                valid_dates = pd.read_sql_query("SELECT date_key FROM dim_time", conn)
+            valid_date_keys = set(valid_dates['date_key'].astype(str).tolist())
+            initial_count = len(fact_payment)
+            fact_payment = fact_payment[fact_payment['date_key'].astype(str).isin(valid_date_keys)]
+            if initial_count > len(fact_payment):
+                self.logger.warning(f"  → Filtered out {initial_count - len(fact_payment)} payment records with invalid date_keys")
+        
         # Filter to only include students that exist in dim_student
         if not fact_payment.empty:
             with engine.connect() as conn:
                 valid_students = pd.read_sql_query("SELECT student_id FROM dim_student", conn)
             valid_student_ids = set(valid_students['student_id'].tolist())
+            initial_count = len(fact_payment)
             fact_payment = fact_payment[fact_payment['student_id'].isin(valid_student_ids)]
+            if initial_count > len(fact_payment):
+                self.logger.warning(f"  → Filtered out {initial_count - len(fact_payment)} payment records with invalid student_ids")
         
         if not fact_payment.empty:
             fact_payment.to_sql('fact_payment', engine, if_exists='append', index=False, method='multi', chunksize=50)

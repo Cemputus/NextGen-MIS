@@ -12,6 +12,7 @@ import { Select } from '../components/ui/select';
 import { KPICard } from '../components/ui/kpi-card';
 import { DashboardGrid } from '../components/ui/dashboard-grid';
 import GlobalFilterPanel from '../components/GlobalFilterPanel';
+import ExportButtons from '../components/ExportButtons';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Loader2 } from 'lucide-react';

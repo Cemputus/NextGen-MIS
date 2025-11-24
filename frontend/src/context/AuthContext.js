@@ -106,6 +106,11 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post('/api/auth/login', { 
         identifier,  // Can be Access Number, username, or email
         password 
+      }, {
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       const { access_token, refresh_token, user, role } = response.data;
@@ -131,7 +136,18 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userWithRole };
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      let errorMessage = 'Login failed';
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Request timeout: Backend server is not responding. Please ensure the backend is running.';
+      } else if (error.message && error.message.includes('Network Error')) {
+        errorMessage = 'Network error: Cannot connect to backend server. Please ensure the backend is running on http://localhost:5000';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return { success: false, error: errorMessage };
     }
   };

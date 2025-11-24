@@ -11,6 +11,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -45,6 +46,27 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Check if backend is reachable first
+      try {
+        await axios.get('/api/dashboard/stats', {
+          headers: { Authorization: 'Bearer test' },
+          timeout: 3000
+        }).catch(() => {
+          // Expected to fail, but confirms backend is reachable
+        });
+      } catch (networkErr) {
+        if (networkErr.code === 'ECONNABORTED' || networkErr.message.includes('timeout')) {
+          setError('Network timeout: Backend server is not responding. Please ensure the backend is running on http://localhost:5000');
+          setLoading(false);
+          return;
+        }
+        if (networkErr.message.includes('Network Error') || networkErr.code === 'ERR_NETWORK') {
+          setError('Network error: Cannot connect to backend server. Please ensure the backend is running on http://localhost:5000');
+          setLoading(false);
+          return;
+        }
+      }
+
       const result = await login(username.trim(), password);
       
       if (result.success && result.user) {
@@ -73,7 +95,11 @@ const Login = () => {
       }
     } catch (err) {
       console.error('Login exception:', err);
-      setError('An error occurred during login. Please try again.');
+      if (err.message && (err.message.includes('Network') || err.message.includes('timeout'))) {
+        setError('Network error: Cannot connect to backend server. Please ensure the backend is running on http://localhost:5000');
+      } else {
+        setError('An error occurred during login. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

@@ -47,8 +47,16 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
     }
   };
 
+  // Load filter options on initial mount
   useEffect(() => {
-    loadFilterOptions(filters);
+    loadFilterOptions({});
+  }, []);
+
+  // Reload filter options when parent filters change
+  useEffect(() => {
+    if (Object.keys(filters).length > 0) {
+      loadFilterOptions(filters);
+    }
   }, [filters.faculty_id, filters.department_id, filters.program_id]);
 
   const handleFilterChange = (key, value) => {
@@ -59,9 +67,14 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
       // Clear department and program when faculty changes
       delete newFilters.department_id;
       delete newFilters.program_id;
+      delete newFilters.course_code; // Also clear course when faculty changes
     } else if (key === 'department_id') {
-      // Clear program when department changes
+      // Clear program and course when department changes
       delete newFilters.program_id;
+      delete newFilters.course_code;
+    } else if (key === 'program_id') {
+      // Clear course when program changes (optional - you may want to keep this)
+      // delete newFilters.course_code;
     }
     
     if (value === '' || value === null) {
@@ -80,14 +93,22 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
   };
 
   const handleSearch = () => {
-    if (searchTerm) {
-      if (/^[AB]\d{5}$/.test(searchTerm)) {
-        handleFilterChange('access_number', searchTerm);
-      } else if (/\d{2}[BMD]\d{2}\/\d{3}/.test(searchTerm)) {
-        handleFilterChange('reg_number', searchTerm);
-      } else {
-        handleFilterChange('student_name', searchTerm);
+    if (searchTerm.trim()) {
+      const trimmed = searchTerm.trim();
+      // Check for Access Number format (e.g., A12345, B67890)
+      if (/^[AB]\d{5}$/i.test(trimmed)) {
+        handleFilterChange('access_number', trimmed.toUpperCase());
+      } 
+      // Check for Reg Number format (e.g., 22B123/456, 23M456/789)
+      else if (/\d{2}[BMD]\d{2,3}\/\d{2,3}/i.test(trimmed)) {
+        handleFilterChange('reg_number', trimmed.toUpperCase());
+      } 
+      // Otherwise treat as name search
+      else {
+        handleFilterChange('student_name', trimmed);
       }
+      // Clear search term after applying
+      setSearchTerm('');
     }
   };
 
@@ -186,13 +207,13 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
               <Select
                 value={filters.program_id || ''}
                 onChange={(e) => handleFilterChange('program_id', e.target.value || null)}
-                disabled={loading || (!filters.department_id && !filters.faculty_id)}
+                disabled={loading || !filters.faculty_id}
                 className={`h-11 border-2 rounded-lg shadow-sm hover:shadow-md transition-all focus:border-blue-500 ${
-                  (!filters.department_id && !filters.faculty_id) ? 'opacity-50 cursor-not-allowed' : ''
+                  !filters.faculty_id ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 <option value="">
-                  {(filters.department_id || filters.faculty_id) ? 'All Programs' : 'Select Department First'}
+                  {filters.faculty_id ? 'All Programs' : 'Select Faculty First'}
                 </option>
                 {filterOptions.programs?.map(p => (
                   <option key={p.program_id} value={p.program_id}>
@@ -210,7 +231,7 @@ const GlobalFilterPanel = ({ onFilterChange, savedFilters = [] }) => {
                 <option value="">All Courses</option>
                 {filterOptions.courses?.map(c => (
                   <option key={c.course_code} value={c.course_code}>
-                    {c.course_code} - {c.course_name}
+                    {c.course_code} - {c.course_name?.substring(0, 40) || ''}
                   </option>
                 ))}
               </Select>
