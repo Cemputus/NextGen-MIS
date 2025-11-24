@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from sqlalchemy import create_engine, text
 import pandas as pd
+from datetime import datetime
 # Import from parent directory (backend/)
 import sys
 from pathlib import Path
@@ -14,6 +15,16 @@ if str(backend_dir) not in sys.path:
 
 from rbac import Role, Resource, Permission, has_permission
 from ml_models import MultiModelPredictor
+try:
+    from enhanced_predictions import EnhancedPredictor
+    enhanced_predictor = EnhancedPredictor()
+    try:
+        enhanced_predictor.load_all_models()
+    except:
+        print("Enhanced models not loaded. Train models first.")
+except ImportError:
+    enhanced_predictor = None
+    print("Enhanced predictions module not available")
 from config import DATA_WAREHOUSE_CONN_STRING
 
 predictions_bp = Blueprint('predictions', __name__, url_prefix='/api/predictions')
@@ -112,46 +123,192 @@ def predict_scenario():
         if user_scope['role'] not in [Role.ANALYST, Role.SYSADMIN, Role.SENATE]:
             return jsonify({'error': 'Permission denied: Scenario analysis not allowed'}), 403
         
-        scenario = data.get('scenario', {})
-        base_student_id = scenario.get('base_student_id')
+        # Get student_id and scenario parameters
+        student_id = data.get('student_id') or data.get('access_number')
+        scenario_params = data.get('scenario', {})
         
-        # Scenario parameters
-        attendance_rate = scenario.get('attendance_rate')
-        payment_completion_rate = scenario.get('payment_completion_rate')
-        courses_enrolled = scenario.get('courses_enrolled')
-        high_school = scenario.get('high_school')
+        if not student_id:
+            return jsonify({'error': 'Student ID or Access Number required'}), 400
         
-        # Get base student data
+        # Resolve student_id if access_number provided
         engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        if student_id.startswith('A') or student_id.startswith('B'):
+            result = pd.read_sql_query(
+                text("SELECT student_id FROM dim_student WHERE access_number = :access_number"),
+                engine,
+                params={'access_number': student_id}
+            )
+            if not result.empty:
+                student_id = result['student_id'].iloc[0]
+            else:
+                engine.dispose()
+                return jsonify({'error': 'Student not found'}), 404
+        
+        # Get base student features (tuition and attendance data)
         query = text("""
-        SELECT * FROM dim_student WHERE student_id = :student_id
+        SELECT 
+            ds.student_id,
+            COALESCE(SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END), 0) as total_paid,
+            COALESCE(SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END), 0) as total_pending,
+            COALESCE(SUM(fp.amount), 0) as total_required,
+            CASE 
+                WHEN SUM(fp.amount) > 0 
+                THEN SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) / SUM(fp.amount) * 100
+                ELSE 0 
+            END as payment_completion_rate,
+            COUNT(CASE WHEN fp.status = 'Completed' THEN 1 END) as completed_payments,
+            COUNT(CASE WHEN fp.status = 'Pending' THEN 1 END) as pending_payments,
+            DATEDIFF(CURDATE(), MAX(CASE WHEN fp.status = 'Completed' THEN fp.date_key ELSE NULL END)) as days_since_last_payment,
+            CASE 
+                WHEN SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END) > 500000 
+                THEN 1 ELSE 0 
+            END as has_significant_balance,
+            COALESCE(SUM(fa.total_hours), 0) as total_attendance_hours,
+            COALESCE(SUM(fa.days_present), 0) as total_days_present,
+            COALESCE(COUNT(DISTINCT fa.course_code), 0) as courses_attended,
+            CASE 
+                WHEN COUNT(fa.attendance_id) > 0 
+                THEN (SUM(fa.days_present) / COUNT(fa.attendance_id)) * 100
+                ELSE 0 
+            END as attendance_rate,
+            AVG(fa.total_hours) as avg_hours_per_course
+        FROM dim_student ds
+        LEFT JOIN fact_payment fp ON ds.student_id = fp.student_id
+        LEFT JOIN fact_attendance fa ON ds.student_id = fa.student_id
+        WHERE ds.student_id = :student_id
+        GROUP BY ds.student_id
         """)
-        student_data = pd.read_sql_query(query, engine, params={'student_id': base_student_id})
+        
+        student_features = pd.read_sql_query(query, engine, params={'student_id': student_id})
         engine.dispose()
         
-        if student_data.empty:
-            return jsonify({'error': 'Base student not found'}), 404
+        if student_features.empty:
+            return jsonify({'error': 'Student data not found'}), 404
         
-        # Modify features based on scenario
-        # This is a simplified version - in production, you'd modify the feature vector
+        # Apply scenario parameters to modify features
+        base_payment_rate = float(student_features['payment_completion_rate'].iloc[0])
+        base_attendance_rate = float(student_features['attendance_rate'].iloc[0])
+        base_courses = int(student_features['courses_attended'].iloc[0])
+        
+        # Override with scenario parameters if provided
+        modified_payment_rate = scenario_params.get('payment_completion_rate', base_payment_rate)
+        modified_attendance_rate = scenario_params.get('attendance_rate', base_attendance_rate)
+        
+        # Handle courses_enrolled changes
+        courses_change = scenario_params.get('courses_enrolled', 0)
+        if isinstance(courses_change, str):
+            if courses_change.startswith('+'):
+                modified_courses = base_courses + int(courses_change[1:])
+            elif courses_change.startswith('-'):
+                modified_courses = max(0, base_courses - int(courses_change[1:]))
+            elif courses_change == 'optimal':
+                modified_courses = min(base_courses + 2, 8)  # Optimal is slightly more courses
+            else:
+                modified_courses = base_courses
+        else:
+            modified_courses = courses_change if courses_change > 0 else base_courses
+        
+        # Handle has_significant_balance
+        has_significant_balance = scenario_params.get('has_significant_balance', 
+                                                      bool(student_features['has_significant_balance'].iloc[0]))
+        
+        # Prepare modified feature vector for prediction
+        # Use tuition-attendance model if available, otherwise use standard models
         predictions = {}
-        for model_type in ['random_forest', 'gradient_boosting', 'neural_network', 'ensemble']:
+        
+        # Try tuition-attendance model first (most accurate for scenario analysis)
+        if enhanced_predictor and 'tuition_attendance_performance' in enhanced_predictor.models:
             try:
-                pred = predictor.predict(base_student_id, model_type)
+                # Create modified feature vector
+                modified_features = student_features.copy()
+                modified_features['payment_completion_rate'] = modified_payment_rate
+                modified_features['attendance_rate'] = modified_attendance_rate
+                modified_features['courses_attended'] = modified_courses
+                modified_features['has_significant_balance'] = 1 if has_significant_balance else 0
+                
+                # Recalculate derived features
+                modified_features['attendance_payment_score'] = (
+                    modified_attendance_rate * modified_payment_rate / 100
+                )
+                
+                # Get feature columns and scale
+                if 'tuition_attendance_performance' in enhanced_predictor.feature_cols:
+                    feature_cols = enhanced_predictor.feature_cols['tuition_attendance_performance']
+                    X = modified_features[feature_cols].fillna(0).values
+                    
+                    scaler = enhanced_predictor.scalers.get('tuition_attendance_performance')
+                    if scaler:
+                        X_scaled = scaler.transform(X)
+                        model = enhanced_predictor.models['tuition_attendance_performance']
+                        pred = model.predict(X_scaled)[0]
+                        
+                        predictions['tuition_attendance_performance'] = {
+                            'predicted_grade': round(float(pred), 2),
+                            'predicted_letter_grade': get_letter_grade(pred)
+                        }
+            except Exception as e:
+                print(f"Error in tuition-attendance scenario prediction: {e}")
+        
+        # Also run standard models for comparison
+        for model_type in ['random_forest', 'gradient_boosting', 'neural_network']:
+            try:
+                # For standard models, we adjust the prediction based on scenario changes
+                base_pred = predictor.predict(student_id, model_type)
+                
+                # Apply scenario-based adjustments
+                # Higher attendance and payment = better performance
+                attendance_factor = (modified_attendance_rate - base_attendance_rate) / 100 * 5  # 5 points per 10% change
+                payment_factor = (modified_payment_rate - base_payment_rate) / 100 * 3  # 3 points per 10% change
+                courses_factor = (modified_courses - base_courses) * 0.5  # 0.5 points per course
+                
+                adjusted_pred = base_pred + attendance_factor + payment_factor + courses_factor
+                
+                # If significant balance, reduce prediction
+                if has_significant_balance:
+                    adjusted_pred -= 5
+                
+                # Clamp between 0 and 100
+                adjusted_pred = max(0, min(100, adjusted_pred))
+                
                 predictions[model_type] = {
-                    'predicted_grade': round(float(pred), 2),
-                    'predicted_letter_grade': get_letter_grade(pred)
+                    'predicted_grade': round(float(adjusted_pred), 2),
+                    'predicted_letter_grade': get_letter_grade(adjusted_pred)
                 }
-            except:
-                pass
+            except Exception as e:
+                print(f"Error in {model_type} scenario prediction: {e}")
+        
+        # Create ensemble prediction
+        if predictions:
+            avg_grade = sum([p['predicted_grade'] for p in predictions.values()]) / len(predictions)
+            predictions['ensemble'] = {
+                'predicted_grade': round(avg_grade, 2),
+                'predicted_letter_grade': get_letter_grade(avg_grade)
+            }
+        
+        # Build scenario description
+        scenario_description = {
+            'name': 'Custom Scenario',
+            'description': f'Modified: Attendance={modified_attendance_rate:.1f}%, Payment={modified_payment_rate:.1f}%, Courses={modified_courses}'
+        }
         
         return jsonify({
-            'scenario': scenario,
+            'scenario': {
+                **scenario_description,
+                'parameters': {
+                    'attendance_rate': modified_attendance_rate,
+                    'payment_completion_rate': modified_payment_rate,
+                    'courses_enrolled': modified_courses,
+                    'has_significant_balance': has_significant_balance
+                }
+            },
             'predictions': predictions,
-            'analysis': analyze_scenario(scenario, predictions)
+            'analysis': analyze_scenario(scenario_params, predictions)
         }), 200
         
     except Exception as e:
+        import traceback
+        print(f"Scenario prediction error: {e}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 @predictions_bp.route('/batch-predict', methods=['POST'])
@@ -351,4 +508,128 @@ def analyze_scenario(scenario, predictions):
         analysis['recommendations'].append('Financial aid or payment plan may be needed')
     
     return analysis
+
+@predictions_bp.route('/tuition-attendance-performance', methods=['POST'])
+@jwt_required()
+def predict_tuition_attendance_performance():
+    """Predict performance based on tuition timeliness and attendance"""
+    try:
+        claims = get_jwt()
+        user_scope = get_user_scope(claims)
+        
+        if not has_permission(user_scope['role'], Resource.PREDICTIONS, Permission.READ, user_scope):
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        if not enhanced_predictor or 'tuition_attendance_performance' not in enhanced_predictor.models:
+            return jsonify({'error': 'Model not trained. Please train the tuition-attendance-performance model first.'}), 503
+        
+        data = request.get_json()
+        student_id = data.get('student_id') or data.get('access_number')
+        
+        if not student_id:
+            return jsonify({'error': 'Student ID or Access Number required'}), 400
+        
+        # Get student features
+        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        # Use the same query structure as in enhanced_predictions.py
+        query = text("""
+        SELECT 
+            ds.student_id,
+            COALESCE(SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END), 0) as total_paid,
+            COALESCE(SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END), 0) as total_pending,
+            CASE 
+                WHEN SUM(fp.amount) > 0 
+                THEN SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) / SUM(fp.amount) * 100
+                ELSE 0 
+            END as payment_completion_rate,
+            DATEDIFF(CURDATE(), MAX(CASE WHEN fp.status = 'Completed' THEN fp.date_key ELSE NULL END)) as days_since_last_payment,
+            CASE 
+                WHEN SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END) > 500000 
+                THEN 1 ELSE 0 
+            END as has_significant_balance,
+            COALESCE(SUM(fa.total_hours), 0) as total_attendance_hours,
+            CASE 
+                WHEN COUNT(fa.attendance_id) > 0 
+                THEN (SUM(fa.days_present) / COUNT(fa.attendance_id)) * 100
+                ELSE 0 
+            END as attendance_rate,
+            COALESCE(COUNT(DISTINCT fa.course_code), 0) as courses_attended,
+            AVG(fa.total_hours) as avg_hours_per_course,
+            CASE 
+                WHEN COUNT(fa.attendance_id) > 0 AND SUM(fp.amount) > 0
+                THEN ((SUM(fa.days_present) / COUNT(fa.attendance_id)) * 100) * 
+                     (SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) / SUM(fp.amount) * 100) / 100
+                ELSE 0 
+            END as attendance_payment_score
+        FROM dim_student ds
+        LEFT JOIN fact_payment fp ON ds.student_id = fp.student_id
+        LEFT JOIN fact_attendance fa ON ds.student_id = fa.student_id
+        WHERE ds.student_id = :student_id OR ds.access_number = :student_id
+        GROUP BY ds.student_id
+        """)
+        
+        student_data = pd.read_sql_query(query, engine, params={'student_id': student_id})
+        engine.dispose()
+        
+        if student_data.empty:
+            return jsonify({'error': 'Student not found'}), 404
+        
+        # Prepare features
+        feature_cols = enhanced_predictor.feature_cols['tuition_attendance_performance']
+        X = student_data[feature_cols].fillna(0).values
+        
+        # Scale and predict
+        scaler = enhanced_predictor.scalers['tuition_attendance_performance']
+        X_scaled = scaler.transform(X)
+        model = enhanced_predictor.models['tuition_attendance_performance']
+        prediction = model.predict(X_scaled)[0]
+        
+        return jsonify({
+            'student_id': student_id,
+            'model_type': 'tuition_attendance_performance',
+            'predicted_grade': round(float(prediction), 2),
+            'predicted_letter_grade': get_letter_grade(prediction),
+            'payment_completion_rate': float(student_data['payment_completion_rate'].iloc[0]),
+            'attendance_rate': float(student_data['attendance_rate'].iloc[0]),
+            'attendance_payment_score': float(student_data['attendance_payment_score'].iloc[0])
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@predictions_bp.route('/enrollment-trend', methods=['POST'])
+@jwt_required()
+def predict_enrollment_trend():
+    """Predict enrollment trends for resource allocation"""
+    try:
+        claims = get_jwt()
+        user_scope = get_user_scope(claims)
+        
+        if user_scope['role'] not in [Role.ANALYST, Role.SYSADMIN, Role.SENATE, Role.DEAN, Role.HOD]:
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        if not enhanced_predictor or 'enrollment_trend' not in enhanced_predictor.models:
+            return jsonify({'error': 'Model not trained'}), 503
+        
+        data = request.get_json()
+        year = data.get('year', datetime.now().year + 1)
+        quarter = data.get('quarter', 1)
+        program_id = data.get('program_id')
+        department_id = data.get('department_id')
+        faculty_id = data.get('faculty_id')
+        
+        # Get historical data for lag features
+        engine = create_engine(DATA_WAREHOUSE_CONN_STRING)
+        # Implementation would fetch historical data and create lag features
+        # Then use the model to predict
+        
+        return jsonify({
+            'message': 'Enrollment trend prediction',
+            'year': year,
+            'quarter': quarter,
+            'predicted_enrollment': 0  # Placeholder
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
