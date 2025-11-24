@@ -353,26 +353,62 @@ def get_high_school_analytics():
                 where_clauses.append("df.faculty_id = :faculty_id")
                 params['faculty_id'] = user_scope['faculty_id']
         
-        # Apply filters (skip empty strings and "all" values)
+        # Apply filters (skip empty strings, None, and "all" values)
         if filters:
-            if filters.get('faculty_id') and filters.get('faculty_id') not in ['', 'all', 'All Faculties']:
-                where_clauses.append("df.faculty_id = :filter_faculty_id")
-                params['filter_faculty_id'] = filters['faculty_id']
-            if filters.get('department_id') and filters.get('department_id') not in ['', 'all', 'All Departments']:
-                where_clauses.append("ddept.department_id = :filter_department_id")
-                params['filter_department_id'] = filters['department_id']
-            if filters.get('program_id') and filters.get('program_id') not in ['', 'all', 'All Programs']:
-                where_clauses.append("dp.program_id = :filter_program_id")
-                params['filter_program_id'] = filters['program_id']
-            if filters.get('high_school') and filters.get('high_school') not in ['', 'all', 'All High Schools']:
+            # Helper function to check if filter value should be ignored
+            def should_ignore_filter(value):
+                if value is None:
+                    return True
+                if isinstance(value, str):
+                    value_lower = value.lower().strip()
+                    return value_lower in ['', 'all', 'none', 'null', 'undefined', 'select faculty first', 
+                                          'select department first', 'all faculties', 'all departments', 
+                                          'all programs', 'all high schools', 'all years', 'all semesters']
+                return False
+            
+            if filters.get('faculty_id') and not should_ignore_filter(filters.get('faculty_id')):
+                try:
+                    faculty_id_val = int(filters['faculty_id'])
+                    where_clauses.append("df.faculty_id = :filter_faculty_id")
+                    params['filter_faculty_id'] = faculty_id_val
+                except (ValueError, TypeError):
+                    print(f"DEBUG: Invalid faculty_id filter value: {filters.get('faculty_id')}")
+            
+            if filters.get('department_id') and not should_ignore_filter(filters.get('department_id')):
+                try:
+                    dept_id_val = int(filters['department_id'])
+                    where_clauses.append("ddept.department_id = :filter_department_id")
+                    params['filter_department_id'] = dept_id_val
+                except (ValueError, TypeError):
+                    print(f"DEBUG: Invalid department_id filter value: {filters.get('department_id')}")
+            
+            if filters.get('program_id') and not should_ignore_filter(filters.get('program_id')):
+                try:
+                    prog_id_val = int(filters['program_id'])
+                    where_clauses.append("dp.program_id = :filter_program_id")
+                    params['filter_program_id'] = prog_id_val
+                except (ValueError, TypeError):
+                    print(f"DEBUG: Invalid program_id filter value: {filters.get('program_id')}")
+            
+            if filters.get('high_school') and not should_ignore_filter(filters.get('high_school')):
                 where_clauses.append("ds.high_school LIKE :filter_high_school")
                 params['filter_high_school'] = f"%{filters['high_school']}%"
-            if filters.get('intake_year') and filters.get('intake_year') not in ['', 'all', 'All Years']:
-                where_clauses.append("YEAR(ds.admission_date) = :filter_intake_year")
-                params['filter_intake_year'] = filters['intake_year']
-            if filters.get('semester_id') and filters.get('semester_id') not in ['', 'all', 'All Semesters']:
-                where_clauses.append("fg.semester_id = :filter_semester_id")
-                params['filter_semester_id'] = filters['semester_id']
+            
+            if filters.get('intake_year') and not should_ignore_filter(filters.get('intake_year')):
+                try:
+                    year_val = int(filters['intake_year'])
+                    where_clauses.append("YEAR(ds.admission_date) = :filter_intake_year")
+                    params['filter_intake_year'] = year_val
+                except (ValueError, TypeError):
+                    print(f"DEBUG: Invalid intake_year filter value: {filters.get('intake_year')}")
+            
+            if filters.get('semester_id') and not should_ignore_filter(filters.get('semester_id')):
+                try:
+                    sem_id_val = int(filters['semester_id'])
+                    where_clauses.append("fg.semester_id = :filter_semester_id")
+                    params['filter_semester_id'] = sem_id_val
+                except (ValueError, TypeError):
+                    print(f"DEBUG: Invalid semester_id filter value: {filters.get('semester_id')}")
         
         if where_clauses:
             query += " AND " + " AND ".join(where_clauses)
@@ -387,14 +423,19 @@ def get_high_school_analytics():
             check_df = pd.read_sql_query(text(check_query), engine)
             total_high_schools_check = check_df['count'].iloc[0] if not check_df.empty else 0
             print(f"DEBUG: Found {total_high_schools_check} distinct high schools in database")
+            print(f"DEBUG: User role: {user_scope['role']}, Filters received: {filters}")
         except Exception as check_error:
             print(f"DEBUG: Error checking high school count: {check_error}")
             total_high_schools_check = 0
         
         try:
             print(f"DEBUG: Executing high school analytics query with {len(where_clauses)} additional filters")
+            print(f"DEBUG: Where clauses: {where_clauses}")
+            print(f"DEBUG: Query params: {params}")
             df = pd.read_sql_query(text(query), engine, params=params)
             print(f"DEBUG: Query returned {len(df)} rows")
+            if len(df) > 0:
+                print(f"DEBUG: First row sample: {df.iloc[0].to_dict()}")
         except Exception as query_error:
             print(f"High school analytics query error: {query_error}")
             print(f"Query: {query}")
