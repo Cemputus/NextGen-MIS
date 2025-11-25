@@ -95,12 +95,17 @@ const PredictionPage = () => {
   };
 
   const handleScenarioPredict = async (scenario) => {
+    if (!studentIdentifier) {
+      alert('Please enter a student identifier first');
+      return;
+    }
+    
     setLoading(true);
     setSelectedScenario(scenario);
     try {
       const response = await axios.post('/api/predictions/scenario', {
         student_id: studentIdentifier,
-        scenario: scenario.params
+        scenario: scenario.parameters || scenario.params || {}
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });

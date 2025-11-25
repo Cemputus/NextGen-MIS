@@ -487,25 +487,75 @@ def analyze_scenario(scenario, predictions):
         'key_factors': []
     }
     
+    if not predictions:
+        analysis['risk_level'] = 'unknown'
+        analysis['recommendations'].append('Unable to generate predictions. Please check model availability.')
+        return analysis
+    
+    # Calculate average prediction across all models
     avg_prediction = sum([p['predicted_grade'] for p in predictions.values()]) / len(predictions)
     
+    # Determine risk level based on predicted grade
     if avg_prediction < 50:
         analysis['risk_level'] = 'high'
         analysis['recommendations'].append('Student is at high risk of failure. Immediate intervention needed.')
+        analysis['recommendations'].append('Consider academic support programs and counseling.')
     elif avg_prediction < 60:
         analysis['risk_level'] = 'medium-high'
         analysis['recommendations'].append('Student needs support to improve performance.')
-    elif avg_prediction >= 70:
+        analysis['recommendations'].append('Monitor attendance and provide additional tutoring.')
+    elif avg_prediction < 70:
+        analysis['risk_level'] = 'medium'
+        analysis['recommendations'].append('Student is performing adequately but has room for improvement.')
+        analysis['recommendations'].append('Encourage consistent attendance and timely fee payment.')
+    elif avg_prediction >= 80:
         analysis['risk_level'] = 'low'
-        analysis['recommendations'].append('Student is performing well. Maintain current strategies.')
+        analysis['recommendations'].append('Student is performing excellently. Maintain current strategies.')
+        analysis['recommendations'].append('Consider advanced courses or research opportunities.')
+    else:
+        analysis['risk_level'] = 'low'
+        analysis['recommendations'].append('Student is performing well. Continue current approach.')
     
-    if scenario.get('attendance_rate', 100) < 70:
-        analysis['key_factors'].append('Low attendance is a major concern')
-        analysis['recommendations'].append('Implement attendance monitoring and support')
+    # Analyze scenario parameters
+    attendance_rate = scenario.get('attendance_rate')
+    payment_rate = scenario.get('payment_completion_rate')
+    has_balance = scenario.get('has_significant_balance', False)
     
-    if scenario.get('payment_completion_rate', 100) < 50:
-        analysis['key_factors'].append('Tuition arrears may impact performance')
-        analysis['recommendations'].append('Financial aid or payment plan may be needed')
+    if attendance_rate is not None:
+        if attendance_rate < 60:
+            analysis['key_factors'].append('Critical: Very low attendance rate')
+            analysis['recommendations'].append('URGENT: Implement attendance intervention program')
+        elif attendance_rate < 70:
+            analysis['key_factors'].append('Low attendance is a major concern')
+            analysis['recommendations'].append('Implement attendance monitoring and support')
+        elif attendance_rate >= 90:
+            analysis['key_factors'].append('Excellent attendance rate')
+    
+    if payment_rate is not None:
+        if payment_rate < 40:
+            analysis['key_factors'].append('Critical: Significant tuition arrears')
+            analysis['recommendations'].append('URGENT: Financial aid or payment plan needed immediately')
+        elif payment_rate < 60:
+            analysis['key_factors'].append('Tuition arrears may impact performance')
+            analysis['recommendations'].append('Financial aid or payment plan may be needed')
+        elif payment_rate >= 90:
+            analysis['key_factors'].append('Good tuition payment record')
+    
+    if has_balance:
+        analysis['key_factors'].append('Student has significant outstanding balance')
+        analysis['recommendations'].append('Review financial situation and provide payment assistance')
+    
+    # Performance trend analysis
+    if len(predictions) > 1:
+        model_scores = [p['predicted_grade'] for p in predictions.values()]
+        score_range = max(model_scores) - min(model_scores)
+        if score_range > 15:
+            analysis['key_factors'].append('High prediction variance - model uncertainty')
+            analysis['recommendations'].append('Gather more data to improve prediction accuracy')
+    
+    # Ensure we have at least one recommendation
+    if not analysis['recommendations']:
+        analysis['recommendations'].append('Continue monitoring student progress')
     
     return analysis
 
