@@ -187,14 +187,14 @@ const PredictionPage = () => {
               <Input
                 value={studentIdentifier}
                 onChange={(e) => setStudentIdentifier(e.target.value)}
-                placeholder={user?.role === 'student' ? 'A#####' : 'Access Number, Reg No, or Student ID'}
+                placeholder={user?.role === 'student' ? 'A#####' : 'A26143, A25176, A75239, or Student ID'}
                 disabled={user?.role === 'student'}
               />
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Info className="h-3 w-3" />
                 {user?.role === 'student' 
                   ? 'You can only predict your own performance'
-                  : 'Enter Access Number (A#####), Registration Number, or Student ID'}
+                  : 'Sample IDs: A26143, A25176, A75239, A53078, A34331 (or use Student ID like J21B05/001)'}
               </p>
             </div>
 

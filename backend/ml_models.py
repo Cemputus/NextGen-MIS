@@ -371,12 +371,62 @@ class MultiModelPredictor:
             raise ValueError("Model not trained. Please train models first.")
         
         available_cols = [col for col in self.feature_cols if col in student_data.columns]
-        X = student_data[available_cols].fillna(0).values
+        # Ensure all columns are numeric before converting to array
+        X_df = student_data[available_cols].copy()
+        # Convert all columns to numeric, coercing errors (like 'M' strings) to NaN then filling with 0
+        for col in X_df.columns:
+            # First replace common non-numeric strings (case-insensitive)
+            if X_df[col].dtype == 'object' or X_df[col].dtype == 'string':
+                # Replace any string values that look like 'M', 'N/A', etc.
+                X_df[col] = X_df[col].astype(str).replace(['M', 'm', 'N/A', 'n/a', 'NULL', 'null', 'NONE', 'none', '', 'nan', 'NaN'], '0')
+            # Then convert to numeric - this will handle any remaining non-numeric values
+            X_df[col] = pd.to_numeric(X_df[col], errors='coerce').fillna(0)
+        # Ensure final array is float64 - this will raise an error if there are still non-numeric values
+        try:
+            X = X_df.values.astype(np.float64)
+        except (ValueError, TypeError) as e:
+            # If conversion fails, log the problematic columns and force conversion
+            print(f"Warning: Error converting to float64: {e}")
+            print(f"Problematic columns and their dtypes: {X_df.dtypes}")
+            print(f"Sample values:\n{X_df.head()}")
+            # Force all columns to be numeric one more time
+            for col in X_df.columns:
+                X_df[col] = pd.to_numeric(X_df[col], errors='coerce').fillna(0)
+            X = X_df.values.astype(np.float64)
         
         if not hasattr(self.scaler, 'mean_'):
             raise ValueError("Model scaler not fitted. Please train models first.")
         
-        X_scaled = self.scaler.transform(X)
+        try:
+            X_scaled = self.scaler.transform(X)
+        except (ValueError, TypeError) as e:
+            # If transform fails, check for any remaining non-numeric values
+            error_msg = str(e)
+            print(f"Error transforming features: {error_msg}")
+            print(f"Feature columns: {available_cols}")
+            print(f"X shape: {X.shape}, X dtype: {X.dtype}")
+            print(f"X_df dtypes:\n{X_df.dtypes}")
+            print(f"X_df sample:\n{X_df.head()}")
+            # Check if X is still object type (contains strings)
+            if X.dtype == 'object':
+                print("WARNING: X array is object type - contains non-numeric values!")
+                # Force all values to be numeric one more time, more aggressively
+                for col in X_df.columns:
+                    # Convert to string first, replace all non-numeric patterns
+                    col_series = X_df[col].astype(str)
+                    # Replace any single character 'M' or other problematic values
+                    col_series = col_series.replace(['M', 'm', 'N/A', 'n/a', 'NULL', 'null', 'NONE', 'none', '', 'nan', 'NaN', 'None'], '0')
+                    X_df[col] = pd.to_numeric(col_series, errors='coerce').fillna(0)
+                X = X_df.values.astype(np.float64)
+            else:
+                # Just retry with the same X
+                pass
+            # Try transform again
+            try:
+                X_scaled = self.scaler.transform(X)
+            except Exception as e2:
+                print(f"Second transform attempt also failed: {e2}")
+                raise ValueError(f"Unable to transform features. Error: {error_msg}. Retry error: {e2}")
         
         # Make predictions
         if model_type == 'ensemble':

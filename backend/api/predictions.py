@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from sqlalchemy import create_engine, text
 import pandas as pd
+import numpy as np
 from datetime import datetime
 # Import from parent directory (backend/)
 import sys
@@ -35,6 +36,40 @@ try:
     predictor.load_models()
 except:
     print("Models not loaded. Train models first.")
+
+def safe_float(value, default=0.0):
+    """Safely convert value to float, handling various edge cases"""
+    if pd.isna(value) or value is None:
+        return default
+    if isinstance(value, str):
+        # Try to convert string, return default if it fails
+        try:
+            # Handle common non-numeric strings
+            if value.upper() in ['M', 'N/A', 'NULL', 'NONE', '']:
+                return default
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+def safe_int(value, default=0):
+    """Safely convert value to int"""
+    if pd.isna(value) or value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            if value.upper() in ['M', 'N/A', 'NULL', 'NONE', '']:
+                return default
+            return int(float(value))
+        except (ValueError, TypeError):
+            return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 def get_user_scope(claims):
     """Get user's data scope based on role"""
@@ -186,9 +221,39 @@ def predict_scenario():
             return jsonify({'error': 'Student data not found'}), 404
         
         # Apply scenario parameters to modify features
-        base_payment_rate = float(student_features['payment_completion_rate'].iloc[0])
-        base_attendance_rate = float(student_features['attendance_rate'].iloc[0])
-        base_courses = int(student_features['courses_attended'].iloc[0])
+        # Safely convert to numeric, handling NaN, None, and string values
+        def safe_float(value, default=0.0):
+            """Safely convert value to float, handling various edge cases"""
+            if pd.isna(value) or value is None:
+                return default
+            if isinstance(value, str):
+                # Try to convert string, return default if it fails
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return default
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return default
+        
+        def safe_int(value, default=0):
+            """Safely convert value to int"""
+            if pd.isna(value) or value is None:
+                return default
+            if isinstance(value, str):
+                try:
+                    return int(float(value))
+                except (ValueError, TypeError):
+                    return default
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return default
+        
+        base_payment_rate = safe_float(student_features['payment_completion_rate'].iloc[0], 0.0)
+        base_attendance_rate = safe_float(student_features['attendance_rate'].iloc[0], 0.0)
+        base_courses = safe_int(student_features['courses_attended'].iloc[0], 0)
         
         # Override with scenario parameters if provided
         modified_payment_rate = scenario_params.get('payment_completion_rate', base_payment_rate)
@@ -234,7 +299,12 @@ def predict_scenario():
                 # Get feature columns and scale
                 if 'tuition_attendance_performance' in enhanced_predictor.feature_cols:
                     feature_cols = enhanced_predictor.feature_cols['tuition_attendance_performance']
-                    X = modified_features[feature_cols].fillna(0).values
+                    # Ensure all values are numeric before converting to array
+                    X_df = modified_features[feature_cols].copy()
+                    # Convert all columns to numeric, coercing errors to NaN then filling with 0
+                    for col in X_df.columns:
+                        X_df[col] = pd.to_numeric(X_df[col], errors='coerce').fillna(0)
+                    X = X_df.values.astype(np.float64)
                     
                     scaler = enhanced_predictor.scalers.get('tuition_attendance_performance')
                     if scaler:
@@ -242,9 +312,10 @@ def predict_scenario():
                         model = enhanced_predictor.models['tuition_attendance_performance']
                         pred = model.predict(X_scaled)[0]
                         
+                        pred_float = safe_float(pred, 0.0)
                         predictions['tuition_attendance_performance'] = {
-                            'predicted_grade': round(float(pred), 2),
-                            'predicted_letter_grade': get_letter_grade(pred)
+                            'predicted_grade': round(pred_float, 2),
+                            'predicted_letter_grade': get_letter_grade(pred_float)
                         }
             except Exception as e:
                 print(f"Error in tuition-attendance scenario prediction: {e}")
@@ -270,9 +341,10 @@ def predict_scenario():
                 # Clamp between 0 and 100
                 adjusted_pred = max(0, min(100, adjusted_pred))
                 
+                pred_float = safe_float(adjusted_pred, 0.0)
                 predictions[model_type] = {
-                    'predicted_grade': round(float(adjusted_pred), 2),
-                    'predicted_letter_grade': get_letter_grade(adjusted_pred)
+                    'predicted_grade': round(pred_float, 2),
+                    'predicted_letter_grade': get_letter_grade(pred_float)
                 }
             except Exception as e:
                 print(f"Error in {model_type} scenario prediction: {e}")
@@ -624,9 +696,13 @@ def predict_tuition_attendance_performance():
         if student_data.empty:
             return jsonify({'error': 'Student not found'}), 404
         
-        # Prepare features
+        # Prepare features - ensure all values are numeric
         feature_cols = enhanced_predictor.feature_cols['tuition_attendance_performance']
-        X = student_data[feature_cols].fillna(0).values
+        X_df = student_data[feature_cols].copy()
+        # Convert all columns to numeric, coercing errors to NaN then filling with 0
+        for col in X_df.columns:
+            X_df[col] = pd.to_numeric(X_df[col], errors='coerce').fillna(0)
+        X = X_df.values.astype(np.float64)
         
         # Scale and predict
         scaler = enhanced_predictor.scalers['tuition_attendance_performance']
@@ -634,14 +710,17 @@ def predict_tuition_attendance_performance():
         model = enhanced_predictor.models['tuition_attendance_performance']
         prediction = model.predict(X_scaled)[0]
         
+        # Safely convert all values
+        pred_float = safe_float(prediction, 0.0)
+        
         return jsonify({
             'student_id': student_id,
             'model_type': 'tuition_attendance_performance',
-            'predicted_grade': round(float(prediction), 2),
-            'predicted_letter_grade': get_letter_grade(prediction),
-            'payment_completion_rate': float(student_data['payment_completion_rate'].iloc[0]),
-            'attendance_rate': float(student_data['attendance_rate'].iloc[0]),
-            'attendance_payment_score': float(student_data['attendance_payment_score'].iloc[0])
+            'predicted_grade': round(pred_float, 2),
+            'predicted_letter_grade': get_letter_grade(pred_float),
+            'payment_completion_rate': safe_float(student_data['payment_completion_rate'].iloc[0], 0.0),
+            'attendance_rate': safe_float(student_data['attendance_rate'].iloc[0], 0.0),
+            'attendance_payment_score': safe_float(student_data['attendance_payment_score'].iloc[0], 0.0)
         }), 200
         
     except Exception as e:
