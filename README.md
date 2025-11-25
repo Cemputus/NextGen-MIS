@@ -197,31 +197,262 @@ python train_models.py
 
 ## 🛠️ Technology Stack
 
-### Backend
-- **Framework**: Flask (Python)
-- **Database**: MySQL 8.0+
-- **ORM**: SQLAlchemy
-- **Authentication**: Flask-JWT-Extended
-- **ML Libraries**: scikit-learn, pandas, numpy
-- **Data Processing**: pandas, numpy
+### Backend Stack
 
-### Frontend
-- **Framework**: React.js
-- **Styling**: Tailwind CSS
-- **Charts**: SciChart.js (primary), Recharts (fallback)
-- **Icons**: Lucide React
-- **State Management**: React Hooks
-- **HTTP Client**: Axios
+#### Core Framework & Runtime
+- **Python**: 3.8+
+- **Flask**: 2.3.0+ - Web framework
+- **Flask-CORS**: Cross-origin resource sharing
+- **Flask-JWT-Extended**: JWT authentication and authorization
 
-### Data Pipeline
-- **ETL**: Custom Python pipeline
-- **Data Layers**: Bronze (raw), Silver (cleaned), Gold (aggregated)
-- **Warehouse**: Star Schema (Dimensions + Facts)
+#### Database & ORM
+- **MySQL**: 8.0+ - Relational database
+- **SQLAlchemy**: 2.0+ - SQL toolkit and ORM
+- **PyMySQL**: MySQL database connector
+- **pymysql**: Pure Python MySQL client
 
-### Infrastructure
-- **Server**: Flask development server (production: Gunicorn recommended)
-- **Database**: MySQL with InnoDB engine
-- **File Storage**: Local filesystem (CSV, PDF exports)
+#### Machine Learning & Data Science
+- **scikit-learn**: 1.3.0+ - Machine learning library
+  - RandomForestRegressor
+  - GradientBoostingRegressor
+  - MLPRegressor (Neural Network)
+  - StandardScaler, LabelEncoder
+- **pandas**: 2.0+ - Data manipulation and analysis
+- **numpy**: 1.24+ - Numerical computing
+
+#### Data Processing & ETL
+- **pandas**: 1.5.0+ - Data transformation and cleaning
+- **numpy**: 1.23.0+ - Numerical operations
+- **pyarrow**: 10.0.0+ - Columnar data processing
+
+#### Utilities & Tools
+- **python-dotenv**: 1.0.0 - Environment variable management
+- **bcrypt**: 4.1.2 - Password hashing
+- **openpyxl**: 3.1.0+ - Excel file generation
+- **reportlab**: 4.0.7 - PDF generation
+- **pickle**: Built-in - Model serialization
+- **requests**: 2.31.0 - HTTP library
+- **cryptography**: 3.4.0+ - Cryptographic primitives
+- **pyarrow**: 10.0.0+ - Apache Arrow integration
+- **werkzeug**: 3.0.1 - WSGI utilities
+
+#### Development & Testing
+- **pytest**: Testing framework (optional)
+- **python-dateutil**: Date utilities
+
+### Frontend Stack
+
+#### Core Framework
+- **React**: 18.2.0+ - UI library
+- **React DOM**: 18.2.0+ - React rendering
+- **React Router DOM**: 6.8+ - Client-side routing
+
+#### Build Tools
+- **Create React App**: React application scaffolding
+- **Webpack**: Module bundler (via CRA)
+- **Babel**: JavaScript compiler
+- **PostCSS**: CSS processing
+
+#### Styling & UI
+- **Tailwind CSS**: 3.3+ - Utility-first CSS framework
+- **PostCSS**: 8.5.6 - CSS post-processing
+- **Autoprefixer**: 10.4.22 - CSS vendor prefixing
+- **tailwindcss-animate**: 1.0.7 - Animation utilities
+- **tailwind-merge**: 3.4.0 - Merge Tailwind classes
+- **clsx**: 2.1.1 - Conditional class names
+- **class-variance-authority**: 0.7.1 - Component variants
+
+#### Data Visualization
+- **SciChart.js**: 4.0.920 - High-performance charting library (primary)
+  - SciChart2D
+  - XyDataSeries, FastLineRenderableSeries
+  - NumericAxis, CategoryAxis
+- **Recharts**: 2.10.3 - Composable charting library (fallback)
+  - ResponsiveContainer, LineChart, BarChart, AreaChart
+  - PieChart (via stacked column alternative)
+- **Plotly.js**: 2.27.0 - Interactive charting library
+  - react-plotly.js: 2.6.0 - React wrapper for Plotly
+
+#### HTTP & API
+- **Axios**: 1.4+ - HTTP client for API requests
+- **Fetch API**: Native browser API (fallback)
+
+#### Icons & UI Components
+- **Lucide React**: 0.554.0 - Modern icon library
+- **React Icons**: 4.12.0 - Additional icon sets
+- **Chakra UI**: 2.8.2 - Component library (if used)
+  - @emotion/react: 11.11.1
+  - @emotion/styled: 11.11.0
+  - framer-motion: 10.16.16
+- **Radix UI**: @radix-ui/react-tabs - Accessible UI primitives
+
+#### State Management
+- **React Hooks**: Built-in state management
+  - useState, useEffect, useContext
+  - Custom hooks for API calls
+
+#### Export & File Handling
+- **ExcelJS**: 4.4.0 - Excel file generation
+- **xlsx**: 0.18.5 - Excel file parsing
+- **file-saver**: 2.0.5 - File download utility
+- **jspdf**: 3.0.4 - PDF generation
+- **jspdf-autotable**: 5.0.2 - PDF table generation
+- **html2canvas**: 1.4.1 - HTML to canvas conversion
+
+#### Date & Time
+- **date-fns**: 2.30.0 - Date utility library
+
+#### Tables & Data Display
+- **react-table**: 7.8.0 - Table component
+- **react-select**: 5.8.0 - Select dropdown component
+
+#### Development Tools
+- **ESLint**: Code linting
+- **Prettier**: Code formatting (if configured)
+
+### Data Pipeline Stack
+
+#### ETL Framework
+- **Custom Python Pipeline**: Built with pandas and SQLAlchemy
+- **Data Layers**:
+  - **Bronze**: Raw data storage (CSV files)
+  - **Silver**: Cleaned and validated data
+  - **Gold**: Aggregated and transformed data
+
+#### Data Warehouse
+- **MySQL 8.0+**: Star schema design
+- **InnoDB Engine**: Transactional storage
+- **Indexes**: Optimized for query performance
+- **Foreign Keys**: Referential integrity
+
+#### Data Formats
+- **CSV**: Source data format
+- **JSON**: API data exchange
+- **Excel (.xlsx)**: Export format
+- **PDF**: Report generation
+
+### Infrastructure & Deployment
+
+#### Server
+- **Development**: Flask development server
+- **Production**: Gunicorn (recommended) or uWSGI
+- **WSGI**: Python Web Server Gateway Interface
+
+#### Database
+- **MySQL 8.0+**: Primary database
+- **InnoDB**: Storage engine with ACID compliance
+- **Character Set**: utf8mb4 (full Unicode support)
+
+#### File Storage
+- **Local Filesystem**: CSV, PDF, Excel exports
+- **Model Storage**: Pickle files in `backend/models/`
+
+#### Security
+- **JWT**: JSON Web Tokens for authentication
+- **bcrypt**: Password hashing (bcrypt algorithm)
+- **CORS**: Cross-origin resource sharing enabled
+- **RBAC**: Role-based access control
+
+### Development Environment
+
+#### Version Control
+- **Git**: Source control
+- **GitHub/GitLab**: Repository hosting (if used)
+
+#### IDE & Tools
+- **VS Code / PyCharm**: Development IDEs
+- **MySQL Workbench**: Database management
+- **Postman / Insomnia**: API testing
+
+#### Package Management
+- **pip**: Python package manager
+- **npm / yarn**: Node.js package manager
+
+### Complete Dependency List
+
+#### Backend (`requirements.txt`)
+```
+flask==3.0.0
+flask-cors==4.0.0
+flask-jwt-extended==4.6.0
+pandas>=1.5.0,<2.1.0
+numpy>=1.23.0,<1.25.0
+sqlalchemy>=1.4.0,<2.1.0
+scikit-learn>=1.0.0,<1.4.0
+reportlab==4.0.7
+python-dotenv==1.0.0
+werkzeug==3.0.1
+bcrypt==4.1.2
+pymysql==1.1.0
+cryptography>=3.4.0,<42.0.0
+openpyxl>=3.1.0
+requests==2.31.0
+pyarrow>=10.0.0,<14.0.0
+plotly==5.18.0
+dash==2.14.2
+dash-bootstrap-components==1.5.0
+```
+
+#### Frontend (`package.json`)
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.2",
+    "@chakra-ui/react": "^2.8.2",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^2.30.0",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
+    "framer-motion": "^10.16.16",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.554.0",
+    "plotly.js": "^2.27.0",
+    "react-icons": "^4.12.0",
+    "react-plotly.js": "^2.6.0",
+    "react-select": "^5.8.0",
+    "react-table": "^7.8.0",
+    "recharts": "^2.10.3",
+    "scichart": "^4.0.920",
+    "tailwind-merge": "^3.4.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "react-scripts": "^5.0.1",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6",
+    "tailwindcss-animate": "^1.0.7",
+    "@types/node": "^24.10.1"
+  }
+}
+```
+
+### System Requirements
+
+#### Minimum Requirements
+- **OS**: Windows 10+, Linux (Ubuntu 20.04+), macOS 10.15+
+- **Python**: 3.8 or higher
+- **Node.js**: 16.0 or higher
+- **MySQL**: 8.0 or higher
+- **RAM**: 4GB minimum (8GB recommended)
+- **Storage**: 2GB free space
+
+#### Recommended Requirements
+- **OS**: Windows 11, Linux (Ubuntu 22.04+), macOS 12+
+- **Python**: 3.10 or higher
+- **Node.js**: 18.0 or higher
+- **MySQL**: 8.0.30 or higher
+- **RAM**: 8GB or more
+- **Storage**: 5GB+ free space
+- **CPU**: Multi-core processor (2+ cores)
 
 ---
 
