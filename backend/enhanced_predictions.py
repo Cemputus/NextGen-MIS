@@ -153,7 +153,7 @@ class EnhancedPredictor:
         query = """
         SELECT 
             dt.year,
-            QUARTER(dt.date_value) as quarter,
+            dt.quarter,
             dp.program_id,
             ddept.department_id,
             df.faculty_id,
@@ -170,9 +170,9 @@ class EnhancedPredictor:
         JOIN dim_department ddept ON dp.department_id = ddept.department_id
         JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
         LEFT JOIN dim_course dc ON fe.course_code = dc.course_code
-        GROUP BY dt.year, QUARTER(dt.date_value), dp.program_id, ddept.department_id, 
+        GROUP BY dt.year, dt.quarter, dp.program_id, ddept.department_id, 
                  df.faculty_id, ds.high_school, ds.region
-        ORDER BY dt.year, QUARTER(dt.date_value)
+        ORDER BY dt.year, dt.quarter
         """
         
         df = pd.read_sql_query(text(query), engine)
@@ -471,18 +471,43 @@ class EnhancedPredictor:
         results = {}
         
         # 1. Tuition + Attendance → Performance
-        results['tuition_attendance'] = self.train_tuition_attendance_model()
+        try:
+            results['tuition_attendance'] = self.train_tuition_attendance_model()
+            # Save after each successful model to ensure it's persisted
+            self.save_all_models()
+        except Exception as e:
+            print(f"Error training tuition-attendance model: {e}")
+            import traceback
+            traceback.print_exc()
         
         # 2. Enrollment Trends
-        results['enrollment_trend'] = self.train_enrollment_trend_model()
+        try:
+            results['enrollment_trend'] = self.train_enrollment_trend_model()
+            self.save_all_models()
+        except Exception as e:
+            print(f"Error training enrollment trend model: {e}")
+            import traceback
+            traceback.print_exc()
         
         # 3. Foundational Course Performance
-        results['foundational_course'] = self.train_foundational_course_model()
+        try:
+            results['foundational_course'] = self.train_foundational_course_model()
+            self.save_all_models()
+        except Exception as e:
+            print(f"Error training foundational course model: {e}")
+            import traceback
+            traceback.print_exc()
         
         # 4. HR Predictions
-        results['hr'] = self.train_hr_models()
+        try:
+            results['hr'] = self.train_hr_models()
+            self.save_all_models()
+        except Exception as e:
+            print(f"Error training HR models: {e}")
+            import traceback
+            traceback.print_exc()
         
-        # Save all models
+        # Final save to ensure everything is persisted
         self.save_all_models()
         
         print("\n" + "=" * 60)

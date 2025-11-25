@@ -27,6 +27,7 @@ class MultiModelPredictor:
         self.model_path = Path(__file__).parent / "models"
         self.model_path.mkdir(parents=True, exist_ok=True)
         self.feature_cols = None
+        self.label_encoders = {}  # Store label encoders for categorical variables
     
     def prepare_features(self):
         """Prepare features from data warehouse with enhanced features including high school"""
@@ -196,7 +197,7 @@ class MultiModelPredictor:
         
         # Encode categorical variables - ensure all strings are converted
         categorical_cols = ['gender', 'nationality', 'high_school', 'high_school_district']
-        label_encoders = {}
+        self.label_encoders = {}
         
         for col in categorical_cols:
             if col in features_df.columns:
@@ -204,7 +205,7 @@ class MultiModelPredictor:
                 # Convert to string, handle NaN/None values
                 features_df[col] = features_df[col].fillna('Unknown').astype(str)
                 features_df[col] = le.fit_transform(features_df[col])
-                label_encoders[col] = le
+                self.label_encoders[col] = le
         
         # Ensure all non-numeric columns are either encoded or dropped
         # Convert any remaining object/string columns that might cause issues
@@ -217,7 +218,7 @@ class MultiModelPredictor:
                     # If conversion fails, use label encoding
                     le = LabelEncoder()
                     features_df[col] = le.fit_transform(features_df[col].astype(str).fillna('Unknown'))
-                    label_encoders[col] = le
+                    self.label_encoders[col] = le
         
         # Select numeric features
         self.feature_cols = features_df.select_dtypes(include=[np.number]).columns.tolist()
@@ -360,25 +361,59 @@ class MultiModelPredictor:
         if student_data.empty:
             raise ValueError(f"Student {student_id} not found")
         
-        # Encode categorical variables
-        student_data['gender_encoded'] = student_data['gender'].map({'M': 1, 'F': 0}).fillna(0)
-        student_data['nationality_encoded'] = pd.Categorical(student_data['nationality']).codes
-        student_data['high_school_encoded'] = pd.Categorical(student_data['high_school']).codes
-        student_data['high_school_district_encoded'] = pd.Categorical(student_data['high_school_district']).codes
+        # Encode categorical variables - MUST match training encoding
+        # Use the same label encoders from training, or encode in place like training does
+        categorical_cols = ['gender', 'nationality', 'high_school', 'high_school_district']
+        
+        for col in categorical_cols:
+            if col in student_data.columns:
+                if col in self.label_encoders:
+                    # Use saved label encoder from training
+                    le = self.label_encoders[col]
+                    # Convert to string, handle NaN/None values (same as training)
+                    student_data[col] = student_data[col].fillna('Unknown').astype(str)
+                    # Handle unseen values - use 'Unknown' for values not in training
+                    try:
+                        student_data[col] = le.transform(student_data[col])
+                    except ValueError:
+                        # If value not seen during training, map to 'Unknown' first
+                        student_data[col] = student_data[col].replace(
+                            [v for v in student_data[col].unique() if v not in le.classes_],
+                            'Unknown'
+                        )
+                        student_data[col] = le.transform(student_data[col])
+                else:
+                    # Fallback: encode using same method as training
+                    # Convert to string, handle NaN/None values
+                    student_data[col] = student_data[col].fillna('Unknown').astype(str)
+                    # For gender, use simple mapping
+                    if col == 'gender':
+                        student_data[col] = student_data[col].map({'M': 1, 'F': 0, 'Male': 1, 'Female': 0}).fillna(0)
+                    else:
+                        # Use categorical codes as fallback
+                        student_data[col] = pd.Categorical(student_data[col]).codes
         
         # Prepare feature vector
         if not self.feature_cols:
             raise ValueError("Model not trained. Please train models first.")
         
-        available_cols = [col for col in self.feature_cols if col in student_data.columns]
+        # Check for missing columns and add them with default values
+        missing_cols = set(self.feature_cols) - set(student_data.columns)
+        if missing_cols:
+            print(f"Warning: Missing columns in prediction data: {missing_cols}")
+            for col in missing_cols:
+                student_data[col] = 0  # Add missing columns with default value 0
+        
+        # Use all feature_cols to match training (in correct order)
+        X_df = student_data[self.feature_cols].copy()
+        
         # Ensure all columns are numeric before converting to array
-        X_df = student_data[available_cols].copy()
-        # Convert all columns to numeric, coercing errors (like 'M' strings) to NaN then filling with 0
+        # This is a safety check - encoding above should have made them numeric, but double-check
         for col in X_df.columns:
-            # First replace common non-numeric strings (case-insensitive)
+            # First replace common non-numeric strings (case-insensitive) - safety check
             if X_df[col].dtype == 'object' or X_df[col].dtype == 'string':
                 # Replace any string values that look like 'M', 'N/A', etc.
-                X_df[col] = X_df[col].astype(str).replace(['M', 'm', 'N/A', 'n/a', 'NULL', 'null', 'NONE', 'none', '', 'nan', 'NaN'], '0')
+                X_df[col] = X_df[col].astype(str).replace(['M', 'm', 'N/A', 'n/a', 'NULL', 'null', 'NONE', 'none', '', 'nan', 'NaN', 'None'], '0')
             # Then convert to numeric - this will handle any remaining non-numeric values
             X_df[col] = pd.to_numeric(X_df[col], errors='coerce').fillna(0)
         # Ensure final array is float64 - this will raise an error if there are still non-numeric values
@@ -455,7 +490,8 @@ class MultiModelPredictor:
         model_data = {
             'models': self.models,
             'scaler': self.scaler,
-            'feature_cols': self.feature_cols
+            'feature_cols': self.feature_cols,
+            'label_encoders': self.label_encoders
         }
         with open(self.model_path / 'multi_model_predictor.pkl', 'wb') as f:
             pickle.dump(model_data, f)
@@ -469,6 +505,7 @@ class MultiModelPredictor:
                 self.models = model_data['models']
                 self.scaler = model_data['scaler']
                 self.feature_cols = model_data['feature_cols']
+                self.label_encoders = model_data.get('label_encoders', {})  # Load label encoders if available
         else:
             print("Models not found. Training new models...")
             self.train_all_models()

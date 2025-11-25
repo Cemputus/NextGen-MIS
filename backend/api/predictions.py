@@ -657,6 +657,7 @@ def predict_tuition_attendance_performance():
         query = text("""
         SELECT 
             ds.student_id,
+            -- Tuition Features (must match training query exactly)
             COALESCE(SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END), 0) as total_paid,
             COALESCE(SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END), 0) as total_pending,
             CASE 
@@ -664,11 +665,13 @@ def predict_tuition_attendance_performance():
                 THEN SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) / SUM(fp.amount) * 100
                 ELSE 0 
             END as payment_completion_rate,
+            COUNT(CASE WHEN fp.status = 'Completed' THEN 1 END) as completed_payments,
             DATEDIFF(CURDATE(), MAX(CASE WHEN fp.status = 'Completed' THEN fp.date_key ELSE NULL END)) as days_since_last_payment,
             CASE 
                 WHEN SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END) > 500000 
                 THEN 1 ELSE 0 
             END as has_significant_balance,
+            -- Attendance Features
             COALESCE(SUM(fa.total_hours), 0) as total_attendance_hours,
             CASE 
                 WHEN COUNT(fa.attendance_id) > 0 
@@ -677,6 +680,7 @@ def predict_tuition_attendance_performance():
             END as attendance_rate,
             COALESCE(COUNT(DISTINCT fa.course_code), 0) as courses_attended,
             AVG(fa.total_hours) as avg_hours_per_course,
+            -- Combined Features
             CASE 
                 WHEN COUNT(fa.attendance_id) > 0 AND SUM(fp.amount) > 0
                 THEN ((SUM(fa.days_present) / COUNT(fa.attendance_id)) * 100) * 
@@ -698,6 +702,14 @@ def predict_tuition_attendance_performance():
         
         # Prepare features - ensure all values are numeric
         feature_cols = enhanced_predictor.feature_cols['tuition_attendance_performance']
+        
+        # Check for missing columns and add them with default values
+        missing_cols = set(feature_cols) - set(student_data.columns)
+        if missing_cols:
+            print(f"Warning: Missing columns in prediction data: {missing_cols}")
+            for col in missing_cols:
+                student_data[col] = 0  # Add missing columns with default value 0
+        
         X_df = student_data[feature_cols].copy()
         # Convert all columns to numeric, coercing errors to NaN then filling with 0
         for col in X_df.columns:
