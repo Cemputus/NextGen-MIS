@@ -290,9 +290,25 @@ const FEXAnalytics = () => {
                     </div>
                   ) : (
                     <div className="h-64 flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                      <div className="text-center">
+                      <div className="text-center p-6">
                         <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                        <p>No data available</p>
+                        <p className="text-lg font-medium">No data available</p>
+                        <p className="text-sm mt-2">
+                          {fexData?.debug_info?.message || 'Try adjusting your filters or check if data exists.'}
+                        </p>
+                        {fexData?.debug_info && (
+                          <div className="mt-4 text-xs text-gray-500 space-y-1">
+                            {fexData.debug_info.total_records_in_db > 0 && (
+                              <p>Total records in database: {fexData.debug_info.total_records_in_db}</p>
+                            )}
+                            {fexData.debug_info.drilldown && (
+                              <p>Drilldown level: {fexData.debug_info.drilldown}</p>
+                            )}
+                            {fexData.debug_info.filters_applied && Object.keys(fexData.debug_info.filters_applied).length > 0 && (
+                              <p>Active filters: {Object.keys(fexData.debug_info.filters_applied).filter(k => k !== 'drilldown').join(', ')}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

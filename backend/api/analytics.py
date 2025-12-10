@@ -246,11 +246,23 @@ def get_fex_analytics():
         
         engine.dispose()
         
-        # Return data with summary (summary already calculated from simple query above)
-        return jsonify({
-            'data': df.to_dict('records') if not df.empty else [],
+        # Prepare response with debug info if empty
+        data_records = df.to_dict('records') if not df.empty else []
+        response_data = {
+            'data': data_records,
             'summary': summary
-        }), 200
+        }
+        
+        # Add debug info when no data
+        if df.empty:
+            response_data['debug_info'] = {
+                'message': 'No data matches the current filters. Try adjusting your filters or clearing them to see all data.',
+                'drilldown': drilldown,
+                'filters_applied': filters,
+                'total_records_in_db': summary.get('total_exams', 0)
+            }
+        
+        return jsonify(response_data), 200
         
     except Exception as e:
         import traceback
@@ -483,15 +495,40 @@ def get_high_school_analytics():
                 else 'Low Performance, Low Tuition Completion', axis=1
             )
         
-        return jsonify({
-            'data': df.to_dict('records'),
-            'summary': {
+        # Prepare response data
+        data_records = df.to_dict('records') if not df.empty else []
+        
+        # Calculate summary - handle empty dataframe
+        if df.empty:
+            summary = {
+                'total_high_schools': 0,
+                'total_students': 0,
+                'avg_retention_rate': 0,
+                'avg_graduation_rate': 0,
+                'avg_tuition_completion_rate': 0,
+                'avg_performance': 0,
+                'correlation_analysis': {
+                    'high_perf_high_tuition': 0,
+                    'high_perf_low_tuition': 0,
+                    'low_perf_high_tuition': 0,
+                    'low_perf_low_tuition': 0
+                }
+            }
+            # Include debug info when no data
+            debug_info = {
+                'total_high_schools_in_db': int(total_high_schools_check),
+                'filters_applied': filters,
+                'where_clauses_count': len(where_clauses),
+                'message': 'No data matches the current filters. Try adjusting your filters or clearing them to see all data.'
+            }
+        else:
+            summary = {
                 'total_high_schools': len(df),
-                'total_students': int(df['total_students'].sum()) if not df.empty else 0,
-                'avg_retention_rate': round(df['retention_rate'].mean(), 2) if not df.empty else 0,
-                'avg_graduation_rate': round(df['graduation_rate'].mean(), 2) if not df.empty else 0,
-                'avg_tuition_completion_rate': round(df['tuition_completion_rate'].mean(), 2) if not df.empty else 0,
-                'avg_performance': round(df['avg_grade'].mean(), 2) if not df.empty else 0,
+                'total_students': int(df['total_students'].sum()),
+                'avg_retention_rate': round(df['retention_rate'].mean(), 2),
+                'avg_graduation_rate': round(df['graduation_rate'].mean(), 2),
+                'avg_tuition_completion_rate': round(df['tuition_completion_rate'].mean(), 2),
+                'avg_performance': round(df['avg_grade'].mean(), 2),
                 'correlation_analysis': {
                     'high_perf_high_tuition': int(len(df[(df['avg_grade'] >= 70) & (df['tuition_completion_rate'] >= 80)])),
                     'high_perf_low_tuition': int(len(df[(df['avg_grade'] >= 70) & (df['tuition_completion_rate'] < 80)])),
@@ -499,6 +536,15 @@ def get_high_school_analytics():
                     'low_perf_low_tuition': int(len(df[(df['avg_grade'] < 70) & (df['tuition_completion_rate'] < 80)]))
                 }
             }
+            debug_info = {
+                'total_high_schools_in_db': int(total_high_schools_check),
+                'rows_returned': len(df)
+            }
+        
+        return jsonify({
+            'data': data_records,
+            'summary': summary,
+            'debug_info': debug_info
         }), 200
         
     except Exception as e:

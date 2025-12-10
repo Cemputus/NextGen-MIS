@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).parent
 MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
 MYSQL_PORT = os.environ.get('MYSQL_PORT', '3306')
 MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'G7r!v9Qz#T2p&X8u$Lm4@Hz5')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'root')
 MYSQL_CHARSET = os.environ.get('MYSQL_CHARSET', 'utf8mb4')
 
 # Database names

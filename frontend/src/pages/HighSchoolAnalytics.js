@@ -191,15 +191,27 @@ const HighSchoolAnalytics = () => {
                       />
                     ) : (
                       <div className="h-full flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                        <div className="text-center">
+                        <div className="text-center p-6">
                           <p className="text-lg font-medium">No data available</p>
                           <p className="text-sm mt-2">
-                            {hsData?.error ? `Error: ${hsData.error}` : 'Try adjusting your filters or check if data exists.'}
+                            {hsData?.error ? (
+                              `Error: ${hsData.error}`
+                            ) : hsData?.debug_info?.message ? (
+                              hsData.debug_info.message
+                            ) : (
+                              'Try adjusting your filters or check if data exists.'
+                            )}
                           </p>
                           {hsData?.debug_info && (
-                            <p className="text-xs mt-2 text-gray-500">
-                              High schools in DB: {hsData.debug_info.total_high_schools_in_db || 0}
-                            </p>
+                            <div className="mt-4 text-xs text-gray-500 space-y-1">
+                              <p>High schools in database: {hsData.debug_info.total_high_schools_in_db || 0}</p>
+                              {hsData.debug_info.filters_applied && Object.keys(hsData.debug_info.filters_applied).length > 0 && (
+                                <p>Active filters: {Object.keys(hsData.debug_info.filters_applied).join(', ')}</p>
+                              )}
+                              {hsData.debug_info.where_clauses_count > 0 && (
+                                <p>Filter conditions applied: {hsData.debug_info.where_clauses_count}</p>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

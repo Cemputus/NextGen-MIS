@@ -660,6 +660,7 @@ def predict_tuition_attendance_performance():
             -- Tuition Features (must match training query exactly)
             COALESCE(SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END), 0) as total_paid,
             COALESCE(SUM(CASE WHEN fp.status = 'Pending' THEN fp.amount ELSE 0 END), 0) as total_pending,
+            COALESCE(SUM(fp.amount), 0) as total_required,
             CASE 
                 WHEN SUM(fp.amount) > 0 
                 THEN SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) / SUM(fp.amount) * 100
@@ -673,13 +674,15 @@ def predict_tuition_attendance_performance():
             END as has_significant_balance,
             -- Attendance Features
             COALESCE(SUM(fa.total_hours), 0) as total_attendance_hours,
+            COALESCE(SUM(fa.days_present), 0) as total_days_present,
+            COALESCE(COUNT(fa.attendance_id), 0) as total_attendance_records,
             CASE 
-                WHEN COUNT(fa.attendance_id) > 0 
-                THEN (SUM(fa.days_present) / COUNT(fa.attendance_id)) * 100
-                ELSE 0 
+                WHEN COUNT(fa.attendance_id) > 0 AND SUM(COALESCE(fa.days_present, 0)) > 0
+                THEN LEAST(100.0, (SUM(COALESCE(fa.days_present, 0)) / NULLIF(COUNT(fa.attendance_id), 0)) * 100.0)
+                ELSE 0.0 
             END as attendance_rate,
             COALESCE(COUNT(DISTINCT fa.course_code), 0) as courses_attended,
-            AVG(fa.total_hours) as avg_hours_per_course,
+            COALESCE(AVG(fa.total_hours), 0) as avg_hours_per_course,
             -- Combined Features
             CASE 
                 WHEN COUNT(fa.attendance_id) > 0 AND SUM(fp.amount) > 0
@@ -725,14 +728,46 @@ def predict_tuition_attendance_performance():
         # Safely convert all values
         pred_float = safe_float(prediction, 0.0)
         
+        # Get the actual values and ensure they're properly calculated
+        payment_completion = safe_float(student_data['payment_completion_rate'].iloc[0], 0.0)
+        attendance_rate = safe_float(student_data['attendance_rate'].iloc[0], 0.0)
+        
+        # Ensure attendance rate doesn't exceed 100%
+        attendance_rate = min(100.0, max(0.0, attendance_rate))
+        
+        # If there's no attendance data but student exists, set to 0 instead of showing 100%
+        total_attendance_records = safe_float(student_data.get('total_attendance_records', pd.Series([0])).iloc[0], 0.0)
+        total_days_present = safe_float(student_data.get('total_days_present', pd.Series([0])).iloc[0], 0.0)
+        
+        # Recalculate attendance rate properly: if no records, it's 0%
+        if total_attendance_records == 0:
+            attendance_rate = 0.0
+        else:
+            # Calculate as percentage: (days_present / total_possible_days) * 100
+            # Since we don't have total_possible_days, use a more meaningful calculation
+            # Attendance rate = (days_present / attendance_records) * 100, capped at 100%
+            # But this assumes each record is one day, which might not be accurate
+            # For now, use the calculated rate but ensure it's between 0 and 100
+            calculated_rate = (total_days_present / total_attendance_records) * 100 if total_attendance_records > 0 else 0.0
+            attendance_rate = min(100.0, max(0.0, calculated_rate))
+        
+        # If there's no payment data, payment completion should be 0, not showing incorrectly
+        total_paid = safe_float(student_data.get('total_paid', pd.Series([0])).iloc[0], 0.0)
+        total_required = safe_float(student_data.get('total_required', pd.Series([0])).iloc[0], 0.0)
+        if total_required == 0 and total_paid == 0:
+            payment_completion = 0.0
+        
         return jsonify({
             'student_id': student_id,
             'model_type': 'tuition_attendance_performance',
             'predicted_grade': round(pred_float, 2),
             'predicted_letter_grade': get_letter_grade(pred_float),
-            'payment_completion_rate': safe_float(student_data['payment_completion_rate'].iloc[0], 0.0),
-            'attendance_rate': safe_float(student_data['attendance_rate'].iloc[0], 0.0),
-            'attendance_payment_score': safe_float(student_data['attendance_payment_score'].iloc[0], 0.0)
+            'payment_completion_rate': round(payment_completion, 2),
+            'attendance_rate': round(attendance_rate, 2),
+            'attendance_payment_score': safe_float(student_data['attendance_payment_score'].iloc[0], 0.0),
+            'total_paid': round(total_paid, 2),
+            'total_required': round(total_required, 2),
+            'total_attendance_records': int(total_attendance_records)
         }), 200
         
     except Exception as e:

@@ -197,12 +197,23 @@ def get_dashboard_stats():
             print(f"Error getting avg_graduation_rate: {e}")
             avg_graduation_rate = 0.0
         
+        # Outstanding Payments (Pending payments total)
+        try:
+            outstanding_result = pd.read_sql_query(
+                "SELECT SUM(amount) as total FROM fact_payment WHERE status = 'Pending'", engine
+            )
+            outstanding_payments = float(outstanding_result['total'][0]) if not outstanding_result.empty and pd.notna(outstanding_result['total'][0]) else 0.0
+        except Exception as e:
+            print(f"Error getting outstanding_payments: {e}")
+            outstanding_payments = 0.0
+        
         return jsonify({
             'total_students': total_students,
             'total_courses': total_courses,
             'total_enrollments': total_enrollments,
             'avg_grade': round(avg_grade, 2),
             'total_payments': round(total_payments, 2),
+            'outstanding_payments': round(outstanding_payments, 2),
             'avg_attendance': round(avg_attendance, 2),
             'missed_exams': mex_count,
             'failed_exams': fex_count,
@@ -332,21 +343,25 @@ def get_grades_over_time():
             elif claims.get('access_number'):
                 where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
         
-        # Apply user filters
-        if filters.get('faculty_id'):
+        # Apply user filters (ignore empty strings and "all" values)
+        if filters.get('faculty_id') and str(filters['faculty_id']).strip() and str(filters['faculty_id']).lower() != 'all':
             where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
-        if filters.get('department_id'):
+        if filters.get('department_id') and str(filters['department_id']).strip() and str(filters['department_id']).lower() != 'all':
             where_clauses.append(f"ddept.department_id = {filters['department_id']}")
-        if filters.get('program_id'):
+        if filters.get('program_id') and str(filters['program_id']).strip() and str(filters['program_id']).lower() != 'all':
             where_clauses.append(f"ds.program_id = {filters['program_id']}")
-        if filters.get('semester_id'):
+        if filters.get('semester_id') and str(filters['semester_id']).strip() and str(filters['semester_id']).lower() != 'all':
             where_clauses.append(f"fg.semester_id = {filters['semester_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         
-        # Join with department and faculty for role-based filtering
+        # Join with department and faculty for role-based filtering or when filters are used
+        # For SENATE role, we don't need joins unless filters are applied
         join_clause = ""
-        if role in [Role.HOD, Role.DEAN] or filters.get('faculty_id') or filters.get('department_id'):
+        needs_join = (role in [Role.HOD, Role.DEAN] or 
+                     (filters.get('faculty_id') and str(filters['faculty_id']).strip() and str(filters['faculty_id']).lower() != 'all') or
+                     (filters.get('department_id') and str(filters['department_id']).strip() and str(filters['department_id']).lower() != 'all'))
+        if needs_join:
             join_clause = """
             LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
             LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
@@ -355,47 +370,64 @@ def get_grades_over_time():
         
         query = f"""
         SELECT 
-            CONCAT('Q', CAST(QUARTER(dt.date_value) AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
+            CONCAT('Q', CAST(dt.quarter AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
             dt.year,
-            QUARTER(dt.date_value) as quarter,
+            dt.quarter,
             AVG(CASE WHEN fg.exam_status = 'Completed' THEN fg.grade ELSE NULL END) as avg_grade,
             COUNT(CASE WHEN fg.exam_status = 'Completed' THEN 1 END) as completed_exams,
             COUNT(CASE WHEN fg.exam_status = 'MEX' THEN 1 END) as missed_exams,
             COUNT(CASE WHEN fg.exam_status = 'FEX' THEN 1 END) as failed_exams,
             COUNT(DISTINCT fg.student_id) as total_students,
-            COUNT(DISTINCT fg.course_id) as total_courses
+            COUNT(DISTINCT fg.course_code) as total_courses
         FROM fact_grade fg
-        JOIN dim_time dt ON fg.date_key = dt.date_key
-        JOIN dim_student ds ON fg.student_id = ds.student_id
+        INNER JOIN dim_time dt ON fg.date_key = dt.date_key
+        INNER JOIN dim_student ds ON fg.student_id = ds.student_id
         {join_clause}
         {where_clause}
-        GROUP BY dt.year, QUARTER(dt.date_value)
+        GROUP BY dt.year, dt.quarter
         HAVING COUNT(CASE WHEN fg.exam_status = 'Completed' THEN 1 END) > 0
-        ORDER BY dt.year ASC, QUARTER(dt.date_value) ASC
+        ORDER BY dt.year ASC, dt.quarter ASC
         """
+        
+        print(f"DEBUG: Executing grades-over-time query for role: {role}")
+        print(f"DEBUG: WHERE clause: {where_clause}")
+        print(f"DEBUG: JOIN clause present: {bool(join_clause)}")
         
         df = pd.read_sql_query(text(query), engine)
         engine.dispose()
+        
+        print(f"DEBUG: Query returned {len(df)} rows")
         
         # Calculate pass rate and other metrics
         if not df.empty:
             df['total_exams'] = df['completed_exams'] + df['missed_exams'] + df['failed_exams']
             df['pass_rate'] = (df['completed_exams'] / df['total_exams'] * 100).round(2)
             df['pass_rate'] = df['pass_rate'].fillna(0)
+            
+            result = {
+                'periods': df['period'].tolist(),
+                'grades': df['avg_grade'].round(2).tolist(),
+                'missed_exams': df['missed_exams'].tolist(),
+                'failed_exams': df['failed_exams'].tolist(),
+                'completed_exams': df['completed_exams'].tolist(),
+                'total_students': df['total_students'].tolist(),
+                'total_courses': df['total_courses'].tolist(),
+                'pass_rate': df['pass_rate'].tolist()
+            }
+            print(f"DEBUG: Returning {len(result['periods'])} periods")
+            return jsonify(result)
         else:
-            df['total_exams'] = []
-            df['pass_rate'] = []
-        
-        return jsonify({
-            'periods': df['period'].tolist(),
-            'grades': df['avg_grade'].round(2).tolist(),
-            'missed_exams': df['missed_exams'].tolist(),
-            'failed_exams': df['failed_exams'].tolist(),
-            'completed_exams': df['completed_exams'].tolist(),
-            'total_students': df['total_students'].tolist(),
-            'total_courses': df['total_courses'].tolist(),
-            'pass_rate': df['pass_rate'].tolist()
-        })
+            print("DEBUG: No data returned from query")
+            return jsonify({
+                'periods': [],
+                'grades': [],
+                'missed_exams': [],
+                'failed_exams': [],
+                'completed_exams': [],
+                'total_students': [],
+                'total_courses': [],
+                'pass_rate': []
+            })
     except Exception as e:
         print(f"Error in get_grades_over_time: {e}")
         import traceback
@@ -679,66 +711,93 @@ def get_attendance_trends():
             elif claims.get('access_number'):
                 where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
         
-        # Apply user filters
-        if filters.get('faculty_id'):
+        # Apply user filters (ignore empty strings and "all" values)
+        if filters.get('faculty_id') and str(filters['faculty_id']).strip() and str(filters['faculty_id']).lower() != 'all':
             where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
-        if filters.get('department_id'):
+        if filters.get('department_id') and str(filters['department_id']).strip() and str(filters['department_id']).lower() != 'all':
             where_clauses.append(f"ddept.department_id = {filters['department_id']}")
-        if filters.get('program_id'):
+        if filters.get('program_id') and str(filters['program_id']).strip() and str(filters['program_id']).lower() != 'all':
             where_clauses.append(f"ds.program_id = {filters['program_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         
-        # Join with student, program, department, faculty for role-based filtering
+        # Join with student, program, department, faculty for role-based filtering or when filters are used
+        # For SENATE role without filters, we only need the student join
         join_clause = ""
-        if role in [Role.DEAN, Role.HOD, Role.STUDENT] or filters.get('faculty_id') or filters.get('department_id'):
+        needs_join = (role in [Role.DEAN, Role.HOD, Role.STUDENT] or 
+                     (filters.get('faculty_id') and str(filters['faculty_id']).strip() and str(filters['faculty_id']).lower() != 'all') or
+                     (filters.get('department_id') and str(filters['department_id']).strip() and str(filters['department_id']).lower() != 'all'))
+        if needs_join:
             join_clause = """
-            JOIN dim_student ds ON fa.student_id = ds.student_id
+            INNER JOIN dim_student ds ON fa.student_id = ds.student_id
             LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
             LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
             LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
             """
+        else:
+            # For SENATE role, we still need student join for basic query
+            join_clause = """
+            INNER JOIN dim_student ds ON fa.student_id = ds.student_id
+            """
         
         query = f"""
         SELECT 
-            CONCAT('Q', CAST(QUARTER(dt.date_value) AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
+            CONCAT('Q', CAST(dt.quarter AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
             dt.year,
-            QUARTER(dt.date_value) as quarter,
+            dt.quarter,
             AVG(fa.total_hours) as avg_attendance,
             AVG(fa.days_present) as avg_days_present,
             SUM(fa.total_hours) as total_hours,
             SUM(fa.days_present) as total_days_present,
             COUNT(DISTINCT fa.student_id) as total_students,
-            COUNT(DISTINCT fa.course_id) as total_courses
+            COUNT(DISTINCT fa.course_code) as total_courses
         FROM fact_attendance fa
-        JOIN dim_time dt ON fa.date_key = dt.date_key
+        INNER JOIN dim_time dt ON fa.date_key = dt.date_key
         {join_clause}
         {where_clause}
-        GROUP BY dt.year, QUARTER(dt.date_value)
+        GROUP BY dt.year, dt.quarter
         HAVING COUNT(DISTINCT fa.student_id) > 0
-        ORDER BY dt.year ASC, QUARTER(dt.date_value) ASC
+        ORDER BY dt.year ASC, dt.quarter ASC
         """
+        
+        print(f"DEBUG: Executing attendance-trends query for role: {role}")
+        print(f"DEBUG: WHERE clause: {where_clause}")
+        print(f"DEBUG: JOIN clause: {join_clause[:100] if join_clause else 'None'}...")
         
         df = pd.read_sql_query(text(query), engine)
         engine.dispose()
+        
+        print(f"DEBUG: Query returned {len(df)} rows")
         
         # Calculate attendance rate
         if not df.empty:
             df['attendance_rate'] = (df['avg_days_present'] / 30 * 100).round(2)  # Assuming ~30 days per month
             df['attendance_rate'] = df['attendance_rate'].fillna(0)
+            
+            result = {
+                'periods': df['period'].tolist(),
+                'attendance': df['avg_attendance'].round(2).tolist(),
+                'days_present': df['avg_days_present'].round(2).tolist(),
+                'total_hours': df['total_hours'].round(2).tolist(),
+                'total_days_present': df['total_days_present'].round(2).tolist(),
+                'total_students': df['total_students'].tolist(),
+                'total_courses': df['total_courses'].tolist(),
+                'attendance_rate': df['attendance_rate'].tolist()
+            }
+            print(f"DEBUG: Returning {len(result['periods'])} periods")
+            return jsonify(result)
         else:
-            df['attendance_rate'] = []
-        
-        return jsonify({
-            'periods': df['period'].tolist(),
-            'attendance': df['avg_attendance'].round(2).tolist(),
-            'days_present': df['avg_days_present'].round(2).tolist(),
-            'total_hours': df['total_hours'].round(2).tolist(),
-            'total_days_present': df['total_days_present'].round(2).tolist(),
-            'total_students': df['total_students'].tolist(),
-            'total_courses': df['total_courses'].tolist(),
-            'attendance_rate': df['attendance_rate'].tolist()
-        })
+            print("DEBUG: No data returned from query")
+            return jsonify({
+                'periods': [],
+                'attendance': [],
+                'days_present': [],
+                'total_hours': [],
+                'total_days_present': [],
+                'total_students': [],
+                'total_courses': [],
+                'attendance_rate': []
+            })
     except Exception as e:
         print(f"Error in get_attendance_trends: {e}")
         import traceback
@@ -777,31 +836,39 @@ def get_payment_trends():
             elif claims.get('access_number'):
                 where_clauses.append(f"ds.access_number = '{claims['access_number']}'")
         
-        # Apply user filters
-        if filters.get('faculty_id'):
+        # Apply user filters (ignore empty strings and "all" values)
+        if filters.get('faculty_id') and str(filters['faculty_id']).strip() and str(filters['faculty_id']).lower() != 'all':
             where_clauses.append(f"df.faculty_id = {filters['faculty_id']}")
-        if filters.get('department_id'):
+        if filters.get('department_id') and str(filters['department_id']).strip() and str(filters['department_id']).lower() != 'all':
             where_clauses.append(f"ddept.department_id = {filters['department_id']}")
-        if filters.get('program_id'):
+        if filters.get('program_id') and str(filters['program_id']).strip() and str(filters['program_id']).lower() != 'all':
             where_clauses.append(f"ds.program_id = {filters['program_id']}")
-        if filters.get('semester_id'):
+        if filters.get('semester_id') and str(filters['semester_id']).strip() and str(filters['semester_id']).lower() != 'all':
             where_clauses.append(f"fp.semester_id = {filters['semester_id']}")
         
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         
-        # Join with student, program, department, faculty for role-based filtering
+        # Join with student, program, department, faculty for role-based filtering or when filters are used
         join_clause = ""
-        if role in [Role.DEAN, Role.HOD, Role.STUDENT] or filters.get('faculty_id') or filters.get('department_id'):
+        needs_join = (role in [Role.DEAN, Role.HOD, Role.STUDENT] or 
+                     (filters.get('faculty_id') and str(filters['faculty_id']).strip() and str(filters['faculty_id']).lower() != 'all') or
+                     (filters.get('department_id') and str(filters['department_id']).strip() and str(filters['department_id']).lower() != 'all'))
+        if needs_join:
             join_clause = """
             JOIN dim_student ds ON fp.student_id = ds.student_id
             LEFT JOIN dim_program dp ON ds.program_id = dp.program_id
             LEFT JOIN dim_department ddept ON dp.department_id = ddept.department_id
             LEFT JOIN dim_faculty df ON ddept.faculty_id = df.faculty_id
             """
+        else:
+            # Still need to join with student for basic query
+            join_clause = """
+            JOIN dim_student ds ON fp.student_id = ds.student_id
+            """
         
         query = f"""
         SELECT 
-            CONCAT('Q', CAST(QUARTER(dt.date_value) AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
+            CONCAT('Q', CAST(dt.quarter AS CHAR), ' ', CAST(dt.year AS CHAR)) as period,
             SUM(CASE WHEN fp.status = 'Completed' THEN fp.amount ELSE 0 END) as total_amount,
             COUNT(CASE WHEN fp.status = 'Completed' THEN 1 END) as completed_count,
             COUNT(CASE WHEN fp.status = 'Pending' THEN 1 END) as pending_count
@@ -809,19 +876,27 @@ def get_payment_trends():
         JOIN dim_time dt ON fp.date_key = dt.date_key
         {join_clause}
         {where_clause}
-        GROUP BY dt.year, QUARTER(dt.date_value)
-        ORDER BY dt.year, QUARTER(dt.date_value)
+        GROUP BY dt.year, dt.quarter
+        ORDER BY dt.year, dt.quarter
         """
         
         df = pd.read_sql_query(text(query), engine)
         engine.dispose()
         
-        return jsonify({
-            'periods': df['period'].tolist(),
-            'amounts': df['total_amount'].round(2).tolist(),
-            'completed_payments': df['completed_count'].tolist(),
-            'pending_payments': df['pending_count'].tolist()
-        })
+        if not df.empty:
+            return jsonify({
+                'periods': df['period'].tolist(),
+                'amounts': df['total_amount'].round(2).tolist(),
+                'completed_payments': df['completed_count'].tolist(),
+                'pending_payments': df['pending_count'].tolist()
+            })
+        else:
+            return jsonify({
+                'periods': [],
+                'amounts': [],
+                'completed_payments': [],
+                'pending_payments': []
+            })
     except Exception as e:
         print(f"Error in get_payment_trends: {e}")
         import traceback
